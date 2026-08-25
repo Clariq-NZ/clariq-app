@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
-import { useAuth } from '../lib/auth'
+import { useAuth, isCustomerView, setCustomerView } from '../lib/auth'
 
 /** The menu: one list, grouped by what a person is there to do. Admin-only
  * entries are hidden rather than disabled. */
 export default function MenuPage() {
   const { user, signOut } = useAuth()
-  const admin = !user || user.role_code === 'ADMIN'
+  const cv = isCustomerView(user)
+  const admin = !cv && (!user || user.role_code === 'ADMIN')
+  const staff = !cv
   const Item = ({ to, label, sub }: { to: string; label: string; sub?: string }) => (
     <Link to={to} className="block rounded border border-line bg-surface px-4 py-3.5 min-h-[56px]">
       <span className="block font-medium">{label}</span>
@@ -23,10 +25,13 @@ export default function MenuPage() {
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
       <BrandBar back="/dashboard" />
       <h1 className="font-display text-2xl font-semibold mt-5 mb-5">Menu</h1>
+      {cv && user?.role_code !== 'CUSTOMER' && (
+        <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">Customer view. <button onClick={() => setCustomerView(false)} className="underline font-medium">Back to staff view</button></p>
+      )}
       <Group title="EVERY DAY">
         <Item to="/scan" label="Scan a container" />
         <Item to="/dashboard" label="Today" sub="Overdue and fleet by status" />
-        <Item to="/audit" label="Audit" sub="Walk a site, sight every container" />
+        {staff && <Item to="/audit" label="Audit" sub="Walk a site, sight every container" />}
       </Group>
       <Group title="REPORTS">
         <Item to="/dashboard/circularity" label="Circularity" />

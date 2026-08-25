@@ -5,6 +5,7 @@ import { Field, inputCls, PrimaryButton } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import * as A from '../lib/audit'
 import { attachPhoto } from '../lib/media'
+import { LEVELS, labelsFor } from '../lib/locationLabels'
 
 /** Audit mode - Architecture section 20. Start a session for one site, walk
  * it scanning every container, close it to see the reconciliation. */
@@ -132,7 +133,7 @@ export function SightingPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loc, setLoc] = useState(''); const [newLoc, setNewLoc] = useState<{ faculty: string; building: string; room: string; cabinet: string } | null>(null)
   const [condition, setCondition] = useState(''); const [product, setProduct] = useState(''); const [ownership, setOwnership] = useState('CUSTOMER')
-  const [capacity, setCapacity] = useState(''); const [notes, setNotes] = useState('')
+  const [capacity, setCapacity] = useState(''); const [notes, setNotes] = useState(''); const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState<File | null>(null); const [preview, setPreview] = useState('')
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -157,6 +158,7 @@ export function SightingPage() {
       let locId = loc
       if (newLoc) { const l = await A.addLocation({ site_id: s.site_id, ...newLoc }); locId = l.id }
       const payload: Record<string, unknown> = { condition, ownership }
+      if (description) payload.description = description
       if (capacity) payload.capacity_litres = Number(capacity)
       const { eventId, tenantId } = await A.recordSighting({ containerId: c.id, sessionId: session!, locationId: locId, productId: product || undefined, payload, notes: notes || undefined })
       if (photo) await attachPhoto({ tenantId, containerId: c.id, eventId, file: photo })
@@ -165,6 +167,7 @@ export function SightingPage() {
     } catch (x: any) { setErr(x.message); setBusy(false) }
   }
   const ready = condition && (loc || newLoc) && photo
+  const L = labelsFor(s.customers?.location_labels)
   return (
     <Shell title={c.code} back={`/audit/${session}`}>
       <p className="text-sm text-ink-soft -mt-2 mb-4">{s.sites?.name} {c.container_types?.code && c.container_types.code !== 'TYPE-AUDIT-UNKNOWN' ? `· ${c.container_types.code}` : ''}</p>
@@ -178,8 +181,8 @@ export function SightingPage() {
         <Field label="Location">
           {newLoc ? (
             <div className="grid grid-cols-2 gap-2">
-              {(['faculty', 'building', 'room', 'cabinet'] as const).map(k => (
-                <input key={k} className={inputCls} placeholder={k[0].toUpperCase() + k.slice(1)} value={newLoc[k]} onChange={e => setNewLoc({ ...newLoc, [k]: e.target.value })} />
+              {LEVELS.map(k => (
+                <input key={k} className={inputCls} placeholder={L[k]} value={newLoc[k]} onChange={e => setNewLoc({ ...newLoc, [k]: e.target.value })} />
               ))}
               <button type="button" className="col-span-2 text-sm underline text-ink-soft" onClick={() => setNewLoc(null)}>Choose an existing location instead</button>
             </div>
@@ -203,6 +206,7 @@ export function SightingPage() {
             ))}
           </div>
         </div>
+        <Field label="Describe the container"><input className={inputCls} placeholder="e.g. 20 L blue HDPE drum, screw cap" value={description} onChange={e => setDescription(e.target.value)} /></Field>
         <Field label="Contents">
           <select className={inputCls} value={product} onChange={e => setProduct(e.target.value)}>
             <option value="">Unknown or not listed</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

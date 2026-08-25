@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { Dashboard } from '../lib/gateway'
 import { STATUS_META, type ContainerStatus } from '../lib/status'
-import { useAuth } from '../lib/auth'
+import { useAuth, setCustomerView } from '../lib/auth'
 import { CustomerPicker, useCustomerFilter, withCustomer } from '../lib/customerFilter'
 import { BrandBar, AppFooter } from '../components/Brand'
 
@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [d, setD] = useState<Dashboard | null>(null)
   const [sp] = useSearchParams()
   const customerView = sp.get('view') === 'customer'
+  useEffect(() => { if (customerView) setCustomerView(true) }, [customerView])
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
 
   const overdueOnly = d?.overdue.filter(o => o.flag !== 'DUE_SOON') ?? []
@@ -40,7 +41,7 @@ export default function DashboardPage() {
 
       {customerView ? (
         <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">
-          Customer view. This is what the customer's own users see. <Link to="/dashboard" className="underline font-medium">Back to staff view</Link>
+          Customer view. This is what the customer's own users see. <Link to="/dashboard" onClick={() => setCustomerView(false)} className="underline font-medium">Back to staff view</Link>
         </p>
       ) : <div className="mb-5"><CustomerPicker /></div>}
 

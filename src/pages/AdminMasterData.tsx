@@ -4,6 +4,7 @@ import { BrandBar, AppFooter } from '../components/Brand'
 import { Field, inputCls, PrimaryButton } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { tenantId, listLocations, addLocation, type Location } from '../lib/audit'
+import { PRESETS, LEVELS, labelsFor, type LocationLabels } from '../lib/locationLabels'
 
 /** Stage 4 master data - Architecture section 8.1. Customers hold sites;
  * sites hold locations (faculty, building, room, cabinet). Minimum fields
@@ -78,8 +79,9 @@ export function CustomerDetailPage() {
   const [sites, setSites] = useState<any[]>([])
   const [adding, setAdding] = useState(false)
   const [site, setSite] = useState({ name: '', region: '', address: '' })
+  const [labels, setLabels] = useState<LocationLabels | null>(null)
   const load = async () => {
-    const { data } = await sb().from('customers').select('*').eq('id', id!).maybeSingle(); setC(data)
+    const { data } = await sb().from('customers').select('*').eq('id', id!).maybeSingle(); setC(data); setLabels(labelsFor((data as any)?.location_labels))
     const s = await sb().from('sites').select('id, code, name, region').eq('customer_id', id!).eq('active', true).order('name'); setSites(s.data ?? [])
   }
   useEffect(() => { void load() }, [id])
@@ -89,10 +91,22 @@ export function CustomerDetailPage() {
     const { error } = await sb().from('sites').insert({ tenant_id: t, code, customer_id: id, name: site.name, region: site.region || null, address: { line1: site.address } })
     if (!error) { setSite({ name: '', region: '', address: '' }); setAdding(false); void load() }
   }
-  if (!c) return null
+  const saveLabels = async (next: LocationLabels) => { setLabels(next); await sb().from('customers').update({ location_labels: next }).eq('id', id!) }
+  const applyPreset = (k: string) => saveLabels({ preset: k, ...PRESETS[k], name: undefined } as any)
+  if (!c || !labels) return null
   return (
     <Shell title={c.trading_name || c.legal_name} back="/admin/customers">
       <p className="text-sm text-ink-soft mb-5">{c.code} &middot; {c.primary_contact} {c.email && <>&middot; {c.email}</>}</p>
+      <details className="mb-6 rounded border border-line bg-surface px-4 py-3">
+        <summary className="font-semibold cursor-pointer">Location names <span className="font-normal text-sm text-ink-soft">({PRESETS[labels.preset]?.name ?? 'Custom'})</span></summary>
+        <p className="text-sm text-ink-soft mt-2 mb-3">Four levels, from largest to smallest. Pick the industry closest to this customer, then rename any level.</p>
+        <select className={inputCls + ' mb-3'} value={labels.preset} onChange={e => applyPreset(e.target.value)}>
+          {Object.entries(PRESETS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+        </select>
+        <div className="grid grid-cols-2 gap-2">
+          {LEVELS.map(l => <input key={l} className={inputCls} value={labels[l]} onChange={e => setLabels({ ...labels, [l]: e.target.value })} onBlur={() => saveLabels(labels)} aria-label={`Level ${LEVELS.indexOf(l) + 1}`} />)}
+        </div>
+      </details>
       <h2 className="font-semibold mb-2">Sites</h2>
       <ul className="space-y-2 mb-3">
         {sites.map(s => (
@@ -119,7 +133,7 @@ export function SiteDetailPage() {
   const [locs, setLocs] = useState<Location[]>([])
   const [f, setF] = useState({ faculty: '', building: '', room: '', cabinet: '' })
   const load = async () => {
-    const { data } = await sb().from('sites').select('*, customers(trading_name)').eq('id', id!).maybeSingle(); setSite(data)
+    const { data } = await sb().from('sites').select('*, customers(trading_name, location_labels)').eq('id', id!).maybeSingle(); setSite(data)
     setLocs(await listLocations(id!))
   }
   useEffect(() => { void load() }, [id])
@@ -129,19 +143,17 @@ export function SiteDetailPage() {
     setF({ ...f, cabinet: '' }); void load()
   }
   if (!site) return null
+  const L = labelsFor(site.customers?.location_labels)
   return (
     <Shell title={site.name} back={`/admin/customers/${site.customer_id}`}>
       <p className="text-sm text-ink-soft mb-5">{site.customers?.trading_name} &middot; {site.code}</p>
       <h2 className="font-semibold mb-1">Locations</h2>
-      <p className="text-sm text-ink-soft mb-3">Faculty, building, room or lab, cabinet. Fill in what applies; leave the rest blank. Locations can also be added during an audit walk.</p>
+      <p className="text-sm text-ink-soft mb-3">{L.faculty}, {L.building.toLowerCase()}, {L.room.toLowerCase()}, {L.cabinet.toLowerCase()}. Fill in what applies; leave the rest blank. Locations can also be added during an audit walk.</p>
       <ul className="space-y-1.5 mb-4">
         {locs.map(l => <li key={l.id} className="rounded border border-line bg-surface px-4 py-2.5 text-sm">{l.label || l.code}</li>)}
       </ul>
       <form onSubmit={add} className="grid grid-cols-2 gap-3 rounded border border-line p-4 bg-surface">
-        <Field label="Faculty"><input className={inputCls} value={f.faculty} onChange={e => setF({ ...f, faculty: e.target.value })} /></Field>
-        <Field label="Building"><input className={inputCls} value={f.building} onChange={e => setF({ ...f, building: e.target.value })} /></Field>
-        <Field label="Room or lab"><input className={inputCls} value={f.room} onChange={e => setF({ ...f, room: e.target.value })} /></Field>
-        <Field label="Cabinet"><input className={inputCls} value={f.cabinet} onChange={e => setF({ ...f, cabinet: e.target.value })} /></Field>
+        {LEVELS.map(l => <Field key={l} label={L[l]}><input className={inputCls} value={f[l]} onChange={e => setF({ ...f, [l]: e.target.value })} /></Field>)}
         <div className="col-span-2"><PrimaryButton disabled={!(f.faculty || f.building || f.room || f.cabinet)}>Add location</PrimaryButton></div>
       </form>
     </Shell>

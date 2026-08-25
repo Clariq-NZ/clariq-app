@@ -20,7 +20,7 @@ export async function listSessions(open = true) {
   return (data ?? []) as any[]
 }
 export async function getSession(id: string) {
-  const { data } = await sb().from('audit_sessions').select('*, customers(trading_name), sites(name)').eq('id', id).maybeSingle()
+  const { data } = await sb().from('audit_sessions').select('*, customers(trading_name, location_labels), sites(name)').eq('id', id).maybeSingle()
   return data as any
 }
 export async function startSession(customerId: string, siteId: string, expected?: number) {

@@ -90,6 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => useContext(AuthContext)
 
+/** Customer view: an Admin looking through a customer's eyes (Menu, View as).
+ * Held in sessionStorage so Menu and Guide can hide staff-only content until
+ * the person returns to the staff view. Real customer users are always in it. */
+export function isCustomerView(user: AppUser | null) {
+  return user?.role_code === 'CUSTOMER' || sessionStorage.getItem('customerView') === '1'
+}
+export function setCustomerView(on: boolean) {
+  if (on) sessionStorage.setItem('customerView', '1'); else sessionStorage.removeItem('customerView')
+}
+
 /** Gate for staff routes. Demo mode passes straight through so training and
  * walkthroughs need no account. */
 export function RequireStaff({ children }: { children: ReactNode }) {

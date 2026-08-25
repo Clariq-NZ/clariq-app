@@ -40,7 +40,7 @@
   }
   /* Region motif, chosen per tenant (Architecture 14.1). Set on <html>. */
   html[data-motif='NZ_FERN'] { --motif-url: url('/motif-fern.svg'); --motif-pos: right -60px bottom -40px; --motif-size: 520px auto; }
-  html[data-motif='AU_GUM']  { --motif-url: url('/motif-gum.svg');  --motif-pos: right -40px top 40px;    --motif-size: 300px auto; }
+  html[data-motif='AU_GUM']  { --motif-url: url('/motif-gum.svg');  --motif-pos: right -30px top 56px;    --motif-size: 320px auto; --motif-opacity: 0.16; }
 
   html { background: rgb(var(--paper)); color: rgb(var(--ink)); min-height: 100%; }
   body {

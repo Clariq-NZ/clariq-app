@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { inputCls, PrimaryButton } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
+import jsQR from 'jsqr'
 
 /** Staff scan screen. Camera path uses BarcodeDetector where available;
  * the manual-entry path is always present and equally first-class, because
@@ -23,24 +24,39 @@ export default function ScanPage() {
     let stream: MediaStream | undefined
     let stop = false
     async function run() {
-      const Detector = (window as any).BarcodeDetector
-      if (!Detector || !navigator.mediaDevices?.getUserMedia) { setCameraState('unavailable'); return }
+      if (!navigator.mediaDevices?.getUserMedia) { setCameraState('unavailable'); return }
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         if (!videoRef.current) return
         videoRef.current.srcObject = stream
         await videoRef.current.play()
         setCameraState('live')
-        const detector = new Detector({ formats: ['qr_code'] })
-        const tick = async () => {
+        // BarcodeDetector where the browser has it (Android Chrome); jsQR on a
+        // canvas elsewhere (iOS Safari and Chrome, which lack the API).
+        const Detector = (window as any).BarcodeDetector
+        const detector = Detector ? new Detector({ formats: ['qr_code'] }) : null
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+        let last = 0
+        const found = (raw: string) => { const m = raw.toUpperCase().match(CODE_RE); if (m) { go(m[0]); return true } return false }
+        const tick = async (t: number) => {
           if (stop || !videoRef.current) return
-          try {
-            const codes = await detector.detect(videoRef.current)
-            for (const c of codes) {
-              const m = String(c.rawValue).toUpperCase().match(CODE_RE)
-              if (m) { go(m[0]); return }
-            }
-          } catch { /* frame not ready; keep looping */ }
+          if (t - last > 120) {
+            last = t
+            try {
+              const v = videoRef.current
+              if (detector) {
+                for (const c of await detector.detect(v)) if (found(String(c.rawValue))) return
+              } else if (v.videoWidth) {
+                const scale = Math.min(1, 640 / v.videoWidth)
+                canvas.width = Math.round(v.videoWidth * scale); canvas.height = Math.round(v.videoHeight * scale)
+                ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+                const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+                const q = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' })
+                if (q && found(q.data)) return
+              }
+            } catch { /* frame not ready; keep looping */ }
+          }
           requestAnimationFrame(tick)
         }
         requestAnimationFrame(tick)
