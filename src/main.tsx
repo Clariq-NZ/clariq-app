@@ -9,6 +9,10 @@ import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import { CircularityPage, OverduePage, StatusListPage } from './pages/CircularityPage'
 import { CreateContainersPage, GlossaryPage, ReportPage } from './pages/AdminPages'
+import MenuPage from './pages/MenuPage'
+import GuidePage from './pages/GuidePage'
+import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
+import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
 import { AuthProvider, RequireStaff } from './lib/auth'
 import { hasBackend } from './lib/supabase'
 import './styles/index.css'
@@ -32,6 +36,19 @@ const router = createBrowserRouter([
   { path: '/admin/new-containers', element: staff(<CreateContainersPage />) },
   { path: '/report', element: staff(<ReportPage />) },
   { path: '/glossary', element: <GlossaryPage /> },
+  { path: '/guide', element: <GuidePage /> },
+  { path: '/menu', element: staff(<MenuPage />) },
+  { path: '/admin/customers', element: staff(<CustomersPage />) },
+  { path: '/admin/customers/new', element: staff(<NewCustomerPage />) },
+  { path: '/admin/customers/:id', element: staff(<CustomerDetailPage />) },
+  { path: '/admin/sites/:id', element: staff(<SiteDetailPage />) },
+  { path: '/admin/products', element: staff(<ProductsPage />) },
+  { path: '/admin/settings', element: staff(<SettingsPage />) },
+  { path: '/admin/view-as', element: staff(<ViewAsPage />) },
+  { path: '/audit', element: staff(<AuditHomePage />) },
+  { path: '/audit/:session', element: staff(<AuditSessionPage />) },
+  { path: '/audit/:session/sight/:code', element: staff(<SightingPage />) },
+  { path: '/audit/:session/result', element: staff(<AuditResultPage />) },
   { path: '/scan', element: staff(<ScanPage />) },
   { path: '/c/:code', element: <ScanLanding /> },
   { path: '/c/:code/action/:event', element: staff(<ActionPage />) },

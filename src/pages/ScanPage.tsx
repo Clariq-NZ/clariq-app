@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { inputCls, PrimaryButton } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
 
@@ -12,6 +12,9 @@ const CODE_RE = /CLQ-\d{6}/
 
 export default function ScanPage() {
   const nav = useNavigate()
+  const [sp] = useSearchParams()
+  const next = sp.get('next')
+  const go = (code: string) => nav(next ? `${next}${code}` : `/c/${code}`)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cameraState, setCameraState] = useState<'starting' | 'live' | 'unavailable'>('starting')
   const [manual, setManual] = useState('')
@@ -35,7 +38,7 @@ export default function ScanPage() {
             const codes = await detector.detect(videoRef.current)
             for (const c of codes) {
               const m = String(c.rawValue).toUpperCase().match(CODE_RE)
-              if (m) { nav(`/c/${m[0]}`); return }
+              if (m) { go(m[0]); return }
             }
           } catch { /* frame not ready; keep looping */ }
           requestAnimationFrame(tick)
@@ -47,12 +50,12 @@ export default function ScanPage() {
     }
     run()
     return () => { stop = true; stream?.getTracks().forEach(t => t.stop()) }
-  }, [nav])
+  }, [nav, next])
 
   const submitManual = (e: React.FormEvent) => {
     e.preventDefault()
     const digits = manual.replace(/\D/g, '').padStart(6, '0')
-    if (digits.length === 6) nav(`/c/CLQ-${digits}`)
+    if (digits.length === 6) go(`CLQ-${digits}`)
   }
 
   return (

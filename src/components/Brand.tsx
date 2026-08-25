@@ -21,7 +21,13 @@ export function BrandBar({ back, right, subtitle }:
           {back && <Link to={back} className="text-bar-ink/80 text-sm underline min-h-[44px] flex items-center">&#8249; Back</Link>}
         </div>
         <Link to="/" aria-label="Clariq home" className="flex items-center"><Lockup /></Link>
-        <div className="w-16 flex items-center justify-end text-sm">{right}</div>
+        <div className="w-16 flex items-center justify-end text-sm">
+          {right ?? (
+            <Link to="/menu" aria-label="Menu" className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </Link>
+          )}
+        </div>
       </div>
       {subtitle && (
         <div className="text-center pb-3 text-xs tracking-[0.22em] text-bar-ink/70">{subtitle}</div>

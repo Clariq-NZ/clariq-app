@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { Dashboard } from '../lib/gateway'
 import { STATUS_META, type ContainerStatus } from '../lib/status'
@@ -26,6 +26,8 @@ const GROUP_BORDER: Record<string, string> = {
 export default function DashboardPage() {
   const [customerId] = useCustomerFilter()
   const [d, setD] = useState<Dashboard | null>(null)
+  const [sp] = useSearchParams()
+  const customerView = sp.get('view') === 'customer'
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
 
   const overdueOnly = d?.overdue.filter(o => o.flag !== 'DUE_SOON') ?? []
@@ -36,7 +38,11 @@ export default function DashboardPage() {
     <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Header title="Today" />
 
-      <div className="mb-5"><CustomerPicker /></div>
+      {customerView ? (
+        <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">
+          Customer view. This is what the customer's own users see. <Link to="/dashboard" className="underline font-medium">Back to staff view</Link>
+        </p>
+      ) : <div className="mb-5"><CustomerPicker /></div>}
 
       {d && (
         <>
@@ -88,7 +94,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      <nav className="mt-8 flex gap-2.5">
+      {!customerView && <nav className="mt-8 flex gap-2.5">
         <Link to={withCustomer('/dashboard/circularity', customerId)}
           className="flex-1 min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold text-ink shadow-card">
           Circularity
@@ -97,13 +103,13 @@ export default function DashboardPage() {
           className="flex-1 min-h-[52px] rounded-xl bg-accent text-accent-ink grid place-items-center font-semibold shadow-card">
           Scan
         </Link>
-      </nav>
+      </nav>}
 
-      <nav className="mt-3 grid grid-cols-3 gap-2.5 text-sm">
+      {!customerView && <nav className="mt-3 grid grid-cols-3 gap-2.5 text-sm">
         <Link to="/admin/new-containers" className="min-h-[48px] rounded-xl border border-line bg-surface grid place-items-center text-ink font-medium text-center px-2 leading-tight">New containers</Link>
         <Link to={withCustomer('/report', customerId)} className="min-h-[48px] rounded-xl border border-line bg-surface grid place-items-center text-ink font-medium text-center px-2 leading-tight">Customer report</Link>
-        <Link to="/glossary" className="min-h-[48px] rounded-xl border border-line bg-surface grid place-items-center text-ink font-medium text-center px-2 leading-tight">Glossary</Link>
-      </nav>
+        <Link to="/audit" className="min-h-[48px] rounded-xl border border-line bg-surface grid place-items-center text-ink font-medium text-center px-2 leading-tight">Audit</Link>
+      </nav>}
 
       {gateway.mode === 'demo' && <DemoBadge />}
       <AppFooter />
@@ -115,12 +121,7 @@ export function Header({ title }: { title: string }) {
   const { user, signOut } = useAuth()
   return (
     <>
-      <BrandBar right={user && (
-        <button onClick={signOut} className="text-xs text-bar-ink/80 underline min-h-[44px]"
-          aria-label={`Sign out ${user.display_name}`}>
-          Sign out
-        </button>
-      )} />
+      <BrandBar />
       <h1 className="font-display text-2xl font-semibold pt-5 pb-3">{title}</h1>
     </>
   )

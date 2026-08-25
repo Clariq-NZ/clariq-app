@@ -150,7 +150,7 @@ function makeLive(sb: SupabaseClient): Gateway {
       return (data ?? []).map((r: any) => ({ id: r.code, label: r.label }))
     },
     async createContainers(typeCode, n, supplier) {
-      const { data: me } = await sb.from('app_users').select('tenant_id').single()
+      const { data: me } = await sb.from('app_users').select('tenant_id').eq('id', (await sb.auth.getUser()).data.user?.id ?? '').maybeSingle()
       const { data: t } = await sb.from('container_types').select('id').eq('code', typeCode).single()
       const codes: string[] = []
       for (let i = 0; i < n; i++) {
@@ -184,7 +184,7 @@ function makeLive(sb: SupabaseClient): Gateway {
       }
     },
     async submitEvent(e: SubmitEvent) {
-      const { data: me } = await sb.from('app_users').select('tenant_id').single()
+      const { data: me } = await sb.from('app_users').select('tenant_id').eq('id', (await sb.auth.getUser()).data.user?.id ?? '').maybeSingle()
       const { error } = await sb.from('container_events').insert({
         tenant_id: (me as any)?.tenant_id,
         container_id: e.containerId,
