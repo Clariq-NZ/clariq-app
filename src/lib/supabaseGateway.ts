@@ -47,10 +47,12 @@ function makeLive(sb: SupabaseClient): Gateway {
         lastEventAt: d.updated_at, conditionGrade: d.condition_grade ?? undefined,
       }
     },
-    async listByStatus(status) {
-      const { data } = await sb.from('containers')
+    async listByStatus(status, customerId) {
+      let q = sb.from('containers')
         .select('id, code, status, fill_count, return_count, completed_cycle_count, expected_return_at, condition_grade, container_types ( code, capacity_litres ), customers:current_customer_id ( trading_name, legal_name )')
-        .eq('status', status).order('code')
+        .eq('status', status)
+      if (customerId) q = q.eq('current_customer_id', customerId)
+      const { data } = await q.order('code')
       return (data ?? []).map((d: any) => ({
         id: d.id, code: d.code, status: d.status,
         typeCode: d.container_types?.code ?? '', capacityLitres: d.container_types?.capacity_litres ?? 0,
@@ -61,15 +63,19 @@ function makeLive(sb: SupabaseClient): Gateway {
         conditionGrade: d.condition_grade ?? undefined,
       }))
     },
-    async getDashboard(): Promise<Dashboard> {
+    async getDashboard(customerId): Promise<Dashboard> {
       // Counts by status
-      const { data: rows } = await sb.from('containers').select('status')
+      let cq = sb.from('containers').select('status')
+      if (customerId) cq = cq.eq('current_customer_id', customerId)
+      const { data: rows } = await cq
       const byStatus: Dashboard['byStatus'] = {}
       for (const r of (rows ?? []) as any[]) { const st = r.status as keyof Dashboard['byStatus']; byStatus[st] = (byStatus[st] ?? 0) + 1 }
       // Overdue view (Architecture 10.2)
-      const { data: od } = await sb.from('v_container_overdue')
+      let oq = sb.from('v_container_overdue')
         .select('code, overdue_flag, days_outstanding, customers:current_customer_id ( trading_name, legal_name )')
         .neq('overdue_flag', 'NOT_DUE')
+      if (customerId) oq = oq.eq('current_customer_id', customerId)
+      const { data: od } = await oq
       const overdue = ((od ?? []) as any[]).map(r => ({
         code: r.code, customerName: r.customers?.trading_name ?? r.customers?.legal_name ?? '-',
         daysOutstanding: r.days_outstanding ?? 0, flag: r.overdue_flag,

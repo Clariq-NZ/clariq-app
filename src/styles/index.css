@@ -3,10 +3,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Clariq tokens. Light: charcoal on off-white paper (from the logo).
+   Dark: the same relationships inverted, tuned for a warehouse at night.
+   Accent: Clariq aqua, lifted in dark mode so it still reads. */
 @layer base {
-  html { background: theme('colors.paper'); color: theme('colors.ink.DEFAULT'); }
-  body { font-family: theme('fontFamily.body'); font-size: 16px; }
-  @media (prefers-color-scheme: dark) {
-    html { background: #17191C; color: #EDEBE6; }
+  :root {
+    --paper: 246 245 242;
+    --surface: 255 255 255;
+    --ink: 33 37 42;
+    --ink-soft: 74 80 87;
+    --ink-faint: 122 128 136;
+    --line: 221 219 213;
+    --accent: 14 140 140;
+    --accent-ink: 255 255 255;
+    --fern-opacity: 0.045;
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: 15 17 19;
+      --surface: 29 32 36;
+      --ink: 240 238 233;
+      --ink-soft: 196 200 205;
+      --ink-faint: 150 156 163;
+      --line: 52 56 62;
+      --accent: 63 193 192;
+      --accent-ink: 15 17 19;
+      --fern-opacity: 0.09;
+    }
+  }
+  html {
+    background: rgb(var(--paper));
+    color: rgb(var(--ink));
+    min-height: 100%;
+  }
+  body {
+    font-family: theme('fontFamily.body');
+    font-size: 16px;
+    min-height: 100dvh;
+    position: relative;
+  }
+  /* Silver fern: a single frond rising from the bottom right corner, fixed so
+     it does not scroll with content. Drawn in the ink colour at very low
+     opacity, so it sits behind everything in both themes. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url('/fern.svg');
+    background-repeat: no-repeat;
+    background-position: right -60px bottom -40px;
+    background-size: 520px auto;
+    opacity: var(--fern-opacity);
+  }
+  #root { position: relative; z-index: 1; }
+  :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 }

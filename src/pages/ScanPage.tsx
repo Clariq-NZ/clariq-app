@@ -78,7 +78,7 @@ export default function ScanPage() {
 
       <form onSubmit={submitManual} className="max-w-md w-full mx-auto mt-6 space-y-3">
         <div className="flex items-stretch gap-2">
-          <span className="inline-flex items-center rounded-xl border border-line bg-white px-4 text-lg font-display font-semibold">
+          <span className="inline-flex items-center rounded-xl border border-line bg-surface px-4 text-lg font-display font-semibold">
             CLQ-
           </span>
           <input

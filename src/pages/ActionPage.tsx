@@ -127,7 +127,7 @@ export default function ActionPage() {
   )
 
   return (
-    <main className="min-h-dvh px-5 pb-10 pt-safe max-w-md mx-auto flex flex-col">
+    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-md mx-auto flex flex-col">
       <header className="py-4 flex items-center justify-between">
         <Link to={`/c/${card.code}`} className="text-ink-soft text-sm underline">‹ {card.code}</Link>
         <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
@@ -144,7 +144,7 @@ export default function ActionPage() {
                 {(['A','B','C','D','E'] as const).map(g => (
                   <button key={g} type="button" onClick={() => set('grade', g)}
                     className={`min-h-[52px] rounded-xl border text-lg font-display font-semibold
-                      ${f.grade === g ? 'border-ink bg-ink text-paper' : 'border-line bg-white'}`}>
+                      ${f.grade === g ? 'border-ink bg-ink text-paper' : 'border-line bg-surface'}`}>
                     {g}
                   </button>
                 ))}
@@ -193,7 +193,7 @@ export default function ActionPage() {
             <Toggle label="Unusual contamination?" value={f.contamination ?? null} onChange={v => set('contamination', v)} />
             <Toggle label="Visible damage?" value={f.visible_damage ?? null} onChange={v => set('visible_damage', v)} />
             {(f.contamination === true || f.visible_damage === true) && (
-              <p className="text-sm text-ink-soft rounded-xl border border-line bg-white px-4 py-3">
+              <p className="text-sm text-ink-soft rounded-xl border border-line bg-surface px-4 py-3">
                 This container will go to quarantine for an authorised decision.
               </p>
             )}
@@ -208,7 +208,7 @@ export default function ActionPage() {
                 {['PASS','FAIL'].map(o => (
                   <button key={o} type="button" onClick={() => set('outcome', o)}
                     className={`flex-1 min-h-[52px] rounded-xl border text-lg font-medium
-                      ${f.outcome === o ? 'border-ink bg-ink text-paper' : 'border-line bg-white'}`}>
+                      ${f.outcome === o ? 'border-ink bg-ink text-paper' : 'border-line bg-surface'}`}>
                     {o === 'PASS' ? 'Pass' : 'Fail'}
                   </button>
                 ))}
@@ -240,7 +240,7 @@ export default function ActionPage() {
                 {([['AWAITING_WASH','Wash queue'],['AWAITING_INSPECTION','Inspection']] as const).map(([v,l]) => (
                   <button key={v} type="button" onClick={() => set('destination', v)}
                     className={`flex-1 min-h-[52px] rounded-xl border text-lg font-medium
-                      ${(f.destination ?? 'AWAITING_WASH') === v ? 'border-ink bg-ink text-paper' : 'border-line bg-white'}`}>
+                      ${(f.destination ?? 'AWAITING_WASH') === v ? 'border-ink bg-ink text-paper' : 'border-line bg-surface'}`}>
                     {l}
                   </button>
                 ))}

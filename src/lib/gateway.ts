@@ -88,8 +88,10 @@ export interface CustomerReport {
 export interface Gateway {
   readonly mode: 'demo' | 'live'
   getContainer(code: string): Promise<ContainerCard | null>
-  getDashboard(): Promise<Dashboard>
-  listByStatus(status: ContainerStatus): Promise<ContainerCard[]>
+  /** customerId narrows to containers currently assigned to that customer
+   * (their history lives in getCustomerReport). */
+  getDashboard(customerId?: string): Promise<Dashboard>
+  listByStatus(status: ContainerStatus, customerId?: string): Promise<ContainerCard[]>
   /** Valid actions for the container's current status, derived from the same
    * transition table the database enforces. */
   getActions(status: ContainerStatus): Promise<ActionDef[]>

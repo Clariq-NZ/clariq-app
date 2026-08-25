@@ -5,6 +5,7 @@ import type { ContainerCard, Dashboard } from '../lib/gateway'
 import { STATUS_META, type ContainerStatus } from '../lib/status'
 import { StatusChip } from '../components/ui'
 import { DemoBadge } from './DashboardPage'
+import { CustomerPicker, useCustomerFilter, withCustomer } from '../lib/customerFilter'
 
 /** Screen 2 - Circularity (Architecture 13, structured on the ISO 59020
  * groups in 10.6). Estimated figures carry the badge, always. Customer-facing
@@ -14,18 +15,20 @@ import { DemoBadge } from './DashboardPage'
 const kg = (g: number) => (g / 1000).toFixed(1) + ' kg'
 
 export function CircularityPage() {
+  const [customerId] = useCustomerFilter()
   const [d, setD] = useState<Dashboard | null>(null)
-  useEffect(() => { gateway.getDashboard().then(setD) }, [])
+  useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
   if (!d) return null
   const c = d.circularity
 
   return (
-    <main className="min-h-dvh px-5 pb-10 pt-safe max-w-2xl mx-auto">
-      <Back to="/dashboard" label="Today" />
-      <h1 className="font-display text-xl font-bold mb-1">Circularity</h1>
-      <p className="text-sm text-ink-faint mb-6">
+    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+      <Back to={withCustomer('/dashboard', customerId)} label="Today" />
+      <h1 className="font-display text-2xl font-bold mb-1">Circularity</h1>
+      <p className="text-sm text-ink-soft mb-4">
         Prepared with reference to the measurement framework of ISO 59020:2024.
       </p>
+      <div className="mb-6"><CustomerPicker /></div>
 
       <Group title="Resource inflows">
         <Stat label="Containers commissioned" value={String(c.inflows.commissioned)} />
@@ -64,7 +67,7 @@ export function CircularityPage() {
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-5">
-      <h2 className="text-xs tracking-[0.14em] uppercase text-ink-faint mb-2">{title}</h2>
+      <h2 className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">{title}</h2>
       <div className="grid grid-cols-2 gap-2.5">{children}</div>
     </section>
   )
@@ -73,16 +76,16 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 function Stat({ label, value, badge, wide }:
   { label: string; value: string; badge?: string; wide?: boolean }) {
   return (
-    <div className={`rounded-xl border border-line bg-white px-4 py-3 ${wide ? 'col-span-2' : ''}`}>
+    <div className={`rounded-xl border border-line bg-surface px-4 py-3 shadow-card ${wide ? 'col-span-2' : ''}`}>
       <div className="flex items-baseline gap-2">
-        <span className="font-display text-2xl font-bold">{value}</span>
+        <span className="font-display text-2xl font-bold tabular-nums text-accent">{value}</span>
         {badge && (
           <span className="text-[11px] font-medium rounded-full border border-line px-2 py-0.5 text-ink-soft">
             {badge}
           </span>
         )}
       </div>
-      <div className="text-sm text-ink-soft mt-0.5">{label}</div>
+      <div className="text-sm font-medium text-ink mt-0.5">{label}</div>
     </div>
   )
 }
@@ -91,16 +94,19 @@ function Stat({ label, value, badge, wide }:
 export function StatusListPage() {
   const { status } = useParams()
   const s = status as ContainerStatus
+  const [customerId] = useCustomerFilter()
   const [rows, setRows] = useState<ContainerCard[]>([])
-  useEffect(() => { gateway.listByStatus(s).then(setRows) }, [s])
+  useEffect(() => { gateway.listByStatus(s, customerId || undefined).then(setRows) }, [s, customerId])
 
   return (
-    <main className="min-h-dvh px-5 pb-10 pt-safe max-w-2xl mx-auto">
-      <Back to="/dashboard" label="Today" />
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="font-display text-xl font-bold">{STATUS_META[s]?.label ?? s}</h1>
+    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+      <Back to={withCustomer('/dashboard', customerId)} label="Today" />
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="font-display text-2xl font-bold">{STATUS_META[s]?.label ?? s}</h1>
         <StatusChip status={s} />
       </div>
+      <div className="mb-4"><CustomerPicker /></div>
+      <p className="text-sm text-ink-soft mb-3 tabular-nums">{rows.length} containers</p>
       <RowList rows={rows} />
     </main>
   )
@@ -108,21 +114,23 @@ export function StatusListPage() {
 
 /** Overdue list - the tap-through from the red strip. */
 export function OverduePage() {
+  const [customerId] = useCustomerFilter()
   const [d, setD] = useState<Dashboard | null>(null)
-  useEffect(() => { gateway.getDashboard().then(setD) }, [])
+  useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
   if (!d) return null
 
   return (
-    <main className="min-h-dvh px-5 pb-10 pt-safe max-w-2xl mx-auto">
-      <Back to="/dashboard" label="Today" />
-      <h1 className="font-display text-xl font-bold mb-4">Overdue</h1>
+    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+      <Back to={withCustomer('/dashboard', customerId)} label="Today" />
+      <h1 className="font-display text-2xl font-bold mb-3">Overdue</h1>
+      <div className="mb-4"><CustomerPicker /></div>
       <ul className="space-y-2">
         {d.overdue.map(o => (
           <li key={o.code}>
             <Link to={`/c/${o.code}`}
-              className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3.5">
+              className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3.5 shadow-card">
               <div>
-                <div className="font-display font-semibold">{o.code}</div>
+                <div className="font-display font-semibold text-accent">{o.code}</div>
                 <div className="text-sm text-ink-soft">{o.customerName}</div>
               </div>
               <div className={`text-sm font-semibold ${o.flag === 'DUE_SOON' ? 'text-status-processing' : 'text-status-overdue'}`}>
@@ -143,14 +151,14 @@ function RowList({ rows }: { rows: ContainerCard[] }) {
       {rows.map(c => (
         <li key={c.code}>
           <Link to={`/c/${c.code}`}
-            className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3.5">
+            className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3.5 shadow-card">
             <div>
-              <div className="font-display font-semibold">{c.code}</div>
+              <div className="font-display font-semibold text-accent">{c.code}</div>
               <div className="text-sm text-ink-soft">
                 {c.customerName ?? c.typeCode} · {c.completedCycles} cycles
               </div>
             </div>
-            <span className="text-ink-faint" aria-hidden>›</span>
+            <span className="text-accent text-xl" aria-hidden>›</span>
           </Link>
         </li>
       ))}
@@ -161,7 +169,7 @@ function RowList({ rows }: { rows: ContainerCard[] }) {
 function Back({ to, label }: { to: string; label: string }) {
   return (
     <header className="py-4">
-      <Link to={to} className="text-ink-soft text-sm underline">‹ {label}</Link>
+      <Link to={to} className="text-accent text-sm font-medium">‹ {label}</Link>
     </header>
   )
 }

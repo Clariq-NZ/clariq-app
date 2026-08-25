@@ -42,7 +42,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 export const inputCls =
-  'w-full rounded-xl border border-line bg-white px-4 py-3.5 text-lg ' +
+  'w-full rounded-xl border border-line bg-surface px-4 py-3.5 text-lg ' +
   'focus:border-ink-soft focus:outline-none min-h-[52px]'
 
 export function Toggle({ label, value, onChange }:
@@ -50,7 +50,7 @@ export function Toggle({ label, value, onChange }:
   const btn = (v: boolean, text: string) => (
     <button type="button" onClick={() => onChange(v)}
       className={`flex-1 min-h-[52px] rounded-xl border text-lg font-medium
-        ${value === v ? 'border-ink bg-ink text-paper' : 'border-line bg-white text-ink-soft'}`}>
+        ${value === v ? 'border-ink bg-ink text-paper' : 'border-line bg-surface text-ink-soft'}`}>
       {text}
     </button>
   )

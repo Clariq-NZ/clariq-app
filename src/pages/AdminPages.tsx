@@ -55,7 +55,7 @@ export function CreateContainersPage() {
         </form>
       ) : (
         <div className="space-y-4">
-          <p className="rounded-xl border border-line bg-white px-4 py-3.5">
+          <p className="rounded-xl border border-line bg-surface px-4 py-3.5">
             Created <b>{created.length}</b> containers: <b>{created[0]}</b> to <b>{created[created.length - 1]}</b>,
             all in status <b>New</b>.
           </p>
@@ -76,7 +76,7 @@ export function CreateContainersPage() {
 
 export function ReportPage() {
   const [customers, setCustomers] = useState<Option[]>([])
-  const [customerId, setCustomerId] = useState('')
+  const [customerId, setCustomerId] = useState(new URLSearchParams(location.search).get('customer') ?? '')
   const [period, setPeriod] = useState('Last 12 months')
   const [report, setReport] = useState<CustomerReport | null>(null)
 
@@ -121,7 +121,7 @@ export function ReportPage() {
 
         {report && (
           <>
-            <section className="rounded-2xl border border-line bg-white divide-y divide-line">
+            <section className="rounded-2xl border border-line bg-surface divide-y divide-line">
               {rows.map(([label, value, est]) => (
                 <div key={label} className="flex items-center justify-between px-4 py-3">
                   <span className="text-sm text-ink-soft">{label}</span>
@@ -163,7 +163,7 @@ export function GlossaryPage() {
       </p>
       <ul className="space-y-2.5">
         {GLOSSARY.map(([ops, iso, def]) => (
-          <li key={iso} className="rounded-xl border border-line bg-white px-4 py-3.5">
+          <li key={iso} className="rounded-xl border border-line bg-surface px-4 py-3.5">
             <div className="text-xs text-ink-faint">{ops}</div>
             <div className="font-display font-semibold">{iso}</div>
             <p className="text-sm text-ink-soft mt-1">{def}</p>
@@ -177,7 +177,7 @@ export function GlossaryPage() {
 function Shell({ title, back, children }:
   { title: string; back: string; children: React.ReactNode }) {
   return (
-    <main className="min-h-dvh px-5 pb-10 pt-safe max-w-md mx-auto">
+    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-md mx-auto">
       <header className="py-4 flex items-center justify-between">
         <Link to={back} className="text-ink-soft text-sm underline">&#8249; Back</Link>
         <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>

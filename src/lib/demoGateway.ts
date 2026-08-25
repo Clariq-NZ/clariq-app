@@ -84,11 +84,11 @@ export const demoGateway: Gateway = {
   async getContainer(code) {
     return fleet.get(code.toUpperCase()) ?? null
   },
-  async listByStatus(status) {
-    return [...fleet.values()].filter(c => c.status === status)
+  async listByStatus(status, customerId) {
+    return [...fleet.values()].filter(c => c.status === status && (!customerId || c.customerId === customerId))
   },
-  async getDashboard(): Promise<Dashboard> {
-    const all = [...fleet.values()]
+  async getDashboard(customerId): Promise<Dashboard> {
+    const all = [...fleet.values()].filter(c => !customerId || c.customerId === customerId)
     const byStatus: Dashboard['byStatus'] = {}
     for (const c of all) byStatus[c.status] = (byStatus[c.status] ?? 0) + 1
 

@@ -43,7 +43,7 @@ export default function ContainerPage() {
   return (
     <Shell>
       {/* The card */}
-      <section className="rounded-2xl border border-line bg-white p-5 space-y-4">
+      <section className="rounded-2xl border border-line bg-surface p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xs tracking-[0.2em] text-ink-faint">CONTAINER</div>
@@ -78,7 +78,7 @@ export default function ContainerPage() {
         {actions.map(a => (
           <button key={a.eventType}
             onClick={() => nav(`/c/${card.code}/action/${a.eventType}`)}
-            className="w-full min-h-[56px] rounded-xl border border-line bg-white px-5 text-left text-lg
+            className="w-full min-h-[56px] rounded-xl border border-line bg-surface px-5 text-left text-lg
                        font-medium flex items-center justify-between
                        active:bg-paper focus-visible:outline focus-visible:outline-2">
             <span>{a.label}</span>
@@ -107,7 +107,7 @@ function Item({ k, v }: { k: string; v: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-dvh px-5 pb-10 pt-safe max-w-md mx-auto">
+    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-md mx-auto">
       <header className="py-4 flex items-center justify-between">
         <Link to="/scan" className="text-ink-soft text-sm underline">‹ Scan</Link>
         <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
