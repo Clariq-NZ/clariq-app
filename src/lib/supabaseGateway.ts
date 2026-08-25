@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { supabase } from './supabase'
 import type { ContainerStatus } from './status'
 import type { ActionDef, ContainerCard, CustomerReport, Dashboard, EventType, Gateway, Option, SubmitEvent } from './gateway'
 import { demoGateway } from './demoGateway'
@@ -199,11 +200,9 @@ function makeLive(sb: SupabaseClient): Gateway {
 /** Resolution: live when env vars exist, demo otherwise. Demo can be forced
  * with ?demo=1 for training and walkthroughs even after go-live. */
 export function makeGateway(): Gateway {
-  const url = import.meta.env.VITE_SUPABASE_URL
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY
   const forceDemo = new URLSearchParams(location.search).has('demo')
-  if (!url || !key || forceDemo) return demoGateway
-  return makeLive(createClient(url, key))
+  if (!supabase || forceDemo) return demoGateway
+  return makeLive(supabase)
 }
 
 export const gateway = makeGateway()

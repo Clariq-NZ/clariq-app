@@ -1,3 +1,4 @@
+import { useAuth } from '../lib/auth'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
@@ -96,10 +97,19 @@ export default function DashboardPage() {
 }
 
 export function Header({ title }: { title: string }) {
+  const { user, signOut } = useAuth()
   return (
     <header className="py-4 flex items-center justify-between">
       <h1 className="font-display text-xl font-bold">{title}</h1>
-      <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
+      <div className="flex items-center gap-3">
+        {user && (
+          <button onClick={signOut} className="text-xs text-ink-faint underline min-h-[44px]"
+            aria-label={`Sign out ${user.display_name}`}>
+            {user.display_name.split(' ')[0]} · sign out
+          </button>
+        )}
+        <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
+      </div>
     </header>
   )
 }

@@ -6,36 +6,55 @@ import ScanPage from './pages/ScanPage'
 import ContainerPage from './pages/ContainerPage'
 import ActionPage from './pages/ActionPage'
 import DashboardPage from './pages/DashboardPage'
+import LoginPage from './pages/LoginPage'
 import { CircularityPage, OverduePage, StatusListPage } from './pages/CircularityPage'
 import { CreateContainersPage, GlossaryPage, ReportPage } from './pages/AdminPages'
+import { AuthProvider, RequireStaff } from './lib/auth'
+import { hasBackend } from './lib/supabase'
 import './styles/index.css'
 
-/** Routing - Architecture section 7.
- * /c/:code is the QR landing route. Until auth arrives (Stage 3 completion),
- * it renders the staff container card in demo mode and the public page in
- * live mode without a session. The auth gate slots in here, not in pages. */
+/** Routing - Architecture sections 5 and 7.
+ * Staff routes sit behind RequireStaff. In demo mode (?demo=1, or no backend
+ * configured) the gate passes everyone through so walkthroughs need no
+ * account. /c/:code is the QR landing route: the gate decides whether the
+ * visitor sees the staff card or the public page. */
 
-const staffMode = () =>
-  new URLSearchParams(location.search).has('demo') ||
-  !import.meta.env.VITE_SUPABASE_URL // no backend yet -> demo staff preview
+const demo = new URLSearchParams(location.search).has('demo') || !hasBackend
+const staff = (el: React.ReactNode) => <RequireStaff>{el}</RequireStaff>
 
 const router = createBrowserRouter([
-  { path: '/', element: staffMode() ? <DashboardPage /> : <PublicScanPage /> },
-  { path: '/dashboard', element: <DashboardPage /> },
-  { path: '/dashboard/circularity', element: <CircularityPage /> },
-  { path: '/dashboard/overdue', element: <OverduePage /> },
-  { path: '/dashboard/status/:status', element: <StatusListPage /> },
-  { path: '/admin/new-containers', element: <CreateContainersPage /> },
-  { path: '/report', element: <ReportPage /> },
+  { path: '/', element: demo ? <DashboardPage /> : <PublicScanPage /> },
+  { path: '/login', element: <LoginPage /> },
+  { path: '/dashboard', element: staff(<DashboardPage />) },
+  { path: '/dashboard/circularity', element: staff(<CircularityPage />) },
+  { path: '/dashboard/overdue', element: staff(<OverduePage />) },
+  { path: '/dashboard/status/:status', element: staff(<StatusListPage />) },
+  { path: '/admin/new-containers', element: staff(<CreateContainersPage />) },
+  { path: '/report', element: staff(<ReportPage />) },
   { path: '/glossary', element: <GlossaryPage /> },
-  { path: '/scan', element: <ScanPage /> },
-  { path: '/c/:code', element: staffMode() ? <ContainerPage /> : <PublicScanPage /> },
-  { path: '/c/:code/action/:event', element: <ActionPage /> },
+  { path: '/scan', element: staff(<ScanPage />) },
+  { path: '/c/:code', element: <ScanLanding /> },
+  { path: '/c/:code/action/:event', element: staff(<ActionPage />) },
   { path: '/public/c/:code', element: <PublicScanPage /> },
 ])
 
+/** Signed-in staff get the container card; everyone else the public page.
+ * Decided at render time from the session, not the URL. */
+function ScanLanding() {
+  return demo ? <ContainerPage /> : <SessionSwitch staff={<ContainerPage />} other={<PublicScanPage />} />
+}
+
+import { useAuth } from './lib/auth'
+function SessionSwitch({ staff: s, other }: { staff: React.ReactNode; other: React.ReactNode }) {
+  const { loading, user } = useAuth()
+  if (loading) return null
+  return <>{user && user.role_code !== 'CUSTOMER' ? s : other}</>
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </React.StrictMode>,
 )
