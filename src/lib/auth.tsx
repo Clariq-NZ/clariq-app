@@ -33,11 +33,15 @@ const AuthContext = createContext<AuthState>({
   loading: false, session: null, user: null, signOut: async () => {},
 })
 
-async function loadAppUser(): Promise<AppUser | null> {
+async function loadAppUser(userId: string): Promise<AppUser | null> {
   if (!supabase) return null
+  // Filter on the signed-in user's id. Staff can read every app_users row in the
+  // tenant, so an unfiltered maybeSingle() fails as soon as a second staff user
+  // exists and the app wrongly reports "no role".
   const { data, error } = await supabase
     .from('app_users')
     .select('id, tenant_id, display_name, email, can_authorise, customer_id, roles(code)')
+    .eq('id', userId)
     .maybeSingle()
   if (error || !data) return null
   const roles = data.roles as unknown as { code: string } | { code: string }[] | null
@@ -56,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apply = async (s: Session | null) => {
       if (!alive) return
       setSession(s)
-      setUser(s ? await loadAppUser() : null)
+      setUser(s ? await loadAppUser(s.user.id) : null)
       setLoading(false)
     }
     supabase.auth.getSession().then(({ data }) => apply(data.session))

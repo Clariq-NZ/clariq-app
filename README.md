@@ -1,7 +1,7 @@
 # Clariq Circular Container Platform
 
 Mobile-first PWA for tracking reusable chemical containers through their full
-circular lifecycle. Backed by Supabase (Postgres). See `docs/Architecture.md` —
+circular lifecycle. Backed by Supabase (Postgres). See `docs/Architecture.md` :
 the single source of truth. Anything not in that document does not exist.
 
 ## Repository layout
@@ -13,14 +13,14 @@ supabase/tests/             Database test suite (Stage 1 definition of done)
 src/                        PWA source (from Stage 2)
 ```
 
-## Stage 1 — database layer (complete)
+## Stage 1: database layer (complete)
 
 The migrations implement:
 
 - Tenancy (`tenant_id` everywhere), roles and per-user `can_authorise` flag
 - Human-readable IDs from Postgres sequences (`CLQ-000001`, `CUS-0001`, …)
 - The container state machine as **data** (`allowed_transitions`) enforced by a
-  trigger — invalid transitions are impossible; Admin `ADJUSTMENT` with a
+  trigger: invalid transitions are impossible; Admin `ADJUSTMENT` with a
   mandatory reason is the only escape hatch
 - `containers` as pure derived state: only the event trigger writes it
 - Append-only `container_events` and `audit_log` (UPDATE/DELETE rejected)
