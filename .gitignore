@@ -4,3 +4,4 @@ dist/
 .env.*
 *.local
 clariq-labels-sample.pdf
+.DS_Store
