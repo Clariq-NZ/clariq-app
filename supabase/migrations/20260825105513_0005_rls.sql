@@ -1,4 +1,4 @@
--- Migration 0005: row-level security — Architecture 3, 4
+-- Migration 0005: row-level security: Architecture 3, 4
 -- Staff see their tenant. Customers see only their own rows. Public sees nothing
 -- (the public scan page is served by an edge function returning ID + return text).
 

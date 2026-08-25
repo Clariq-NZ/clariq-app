@@ -18,7 +18,7 @@ create table deposit_transactions (
   created_by       uuid
 );
 
-create view deposit_balances as
+create view deposit_balances with (security_invoker = true) as
 select customer_id, tenant_id,
        sum(case kind when 'CHARGED' then amount
                      when 'REFUNDED' then -amount
@@ -28,7 +28,7 @@ from deposit_transactions
 group by customer_id, tenant_id;
 
 -- ---------------------------------------------------------------------------
--- Recycling chain — with ISO 59014 traceability fields (Arch 8.5)
+-- Recycling chain: with ISO 59014 traceability fields (Arch 8.5)
 -- ---------------------------------------------------------------------------
 create table reprocessed_batches (
   id                   uuid primary key default gen_random_uuid(),
@@ -89,7 +89,7 @@ create trigger recycling_records_touch before update on recycling_records
   for each row execute function touch_row();
 
 -- ---------------------------------------------------------------------------
--- Audit log for master data — Architecture 8.6
+-- Audit log for master data: Architecture 8.6
 -- ---------------------------------------------------------------------------
 create table audit_log (
   id         bigint generated always as identity primary key,
@@ -139,11 +139,11 @@ create trigger audit_log_no_delete before delete on audit_log
   for each row execute function reject_mutation();
 
 -- ---------------------------------------------------------------------------
--- Calculation views — Architecture 10. SQL views so app, export and report agree.
+-- Calculation views: Architecture 10. SQL views so app, export and report agree.
 -- ---------------------------------------------------------------------------
 
 -- Overdue flags (10.2), thresholds from tenant settings
-create view v_container_overdue as
+create view v_container_overdue with (security_invoker = true) as
 select c.id, c.tenant_id, c.code, c.status, c.current_customer_id, c.expected_return_at,
        (current_date - c.last_dispatch_at::date) as days_outstanding,
        case
@@ -158,7 +158,7 @@ join tenants t on t.id = c.tenant_id
 where c.status in ('WITH_CUSTOMER','RETURN_REQUESTED');
 
 -- Cycle times per completed cycle (10.1)
-create view v_cycle_times as
+create view v_cycle_times with (security_invoker = true) as
 select r.container_id, r.tenant_id,
        r.occurred_at as returned_at,
        d.occurred_at as dispatched_at,
@@ -174,7 +174,7 @@ join lateral (
 where r.event_type = 'RETURNED';
 
 -- ISO 59020 circularity groups (10.6), period-bounded by the caller
-create view v_circularity_outflows as
+create view v_circularity_outflows with (security_invoker = true) as
 select rr.tenant_id,
        count(*)                              as containers_retired,
        coalesce(sum(rr.weight_g), 0)         as mass_retired_g,
@@ -188,7 +188,7 @@ select rr.tenant_id,
 from recycling_records rr
 group by rr.tenant_id;
 
-create view v_circularity_inflows as
+create view v_circularity_inflows with (security_invoker = true) as
 select c.tenant_id,
        date_trunc('month', c.commissioning_date)::date as month,
        count(*) as containers_commissioned,
@@ -200,7 +200,7 @@ where c.commissioning_date is not null
 group by c.tenant_id, date_trunc('month', c.commissioning_date);
 
 -- Packaging avoided, estimated (10.4)
-create view v_packaging_avoided as
+create view v_packaging_avoided with (security_invoker = true) as
 select c.tenant_id,
        sum(greatest(c.completed_cycle_count - 1, 0) * coalesce(ct.empty_weight_g, 0)) as packaging_avoided_g,
        'ESTIMATED'::text as basis
@@ -209,7 +209,7 @@ join container_types ct on ct.id = c.container_type_id
 group by c.tenant_id;
 
 -- Fleet economics (10.3)
-create view v_fleet_economics as
+create view v_fleet_economics with (security_invoker = true) as
 select c.tenant_id,
        sum(c.purchase_cost) filter (where c.status not in ('VOID')) as fleet_cost,
        sum(ct.replacement_cost) filter (where c.status not in

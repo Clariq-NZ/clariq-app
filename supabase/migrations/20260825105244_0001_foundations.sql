@@ -1,5 +1,5 @@
 -- Clariq Circular Container Platform
--- Migration 0001: foundations — tenancy, roles, users, reference lists, identifier generation
+-- Migration 0001: foundations: tenancy, roles, users, reference lists, identifier generation
 -- Architecture.md sections 3, 4, 6, 8.1
 
 create extension if not exists pgcrypto;
@@ -35,7 +35,7 @@ create table tenants (
     "emissions_factor_kg_co2e_per_kg": null,
     "methodology_text": "Estimated figures use the methodology configured by the administrator. Prepared with reference to the measurement framework of ISO 59020:2024.",
     "batch_code_regex": "^[A-Z]{2,4}-[0-9]{6}-[A-Z]$",
-    "label_text": "Property of Clariq — please return"
+    "label_text": "Property of Clariq. Please return."
   }'::jsonb,
   created_at  timestamptz not null default now()
 );
@@ -118,7 +118,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Reference lists (all dropdowns; Admin-editable)  — Architecture 8.1
+-- Reference lists (all dropdowns; Admin-editable) : Architecture 8.1
 -- ---------------------------------------------------------------------------
 create table reference_lists (
   id         uuid primary key default gen_random_uuid(),
@@ -132,7 +132,7 @@ create table reference_lists (
 );
 
 -- ---------------------------------------------------------------------------
--- Human-readable ID generation — Architecture section 6.
+-- Human-readable ID generation: Architecture section 6.
 -- One sequence per code family; formatting helper.
 -- ---------------------------------------------------------------------------
 create sequence seq_container  start 1;

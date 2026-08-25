@@ -1,4 +1,4 @@
--- Migration 0003: containers, identifiers, events, state machine — Architecture 8.2, 8.3, 9
+-- Migration 0003: containers, identifiers, events, state machine: Architecture 8.2, 8.3, 9
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -125,7 +125,7 @@ create table event_media (
 );
 
 -- ---------------------------------------------------------------------------
--- Transition table — Architecture 9.2. Data, not code: the mobile action list
+-- Transition table: Architecture 9.2. Data, not code: the mobile action list
 -- is generated from this table.
 -- ---------------------------------------------------------------------------
 create table allowed_transitions (
@@ -196,7 +196,7 @@ insert into event_required_payload values
   ('RECYCLED',           array['weight_recovered_g','processing_method']);
 
 -- ---------------------------------------------------------------------------
--- Event validation trigger — the state machine, enforced.
+-- Event validation trigger: the state machine, enforced.
 -- ---------------------------------------------------------------------------
 create or replace function validate_container_event() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -299,7 +299,7 @@ create trigger container_events_no_delete before delete on container_events
   for each row execute function reject_mutation();
 
 -- ---------------------------------------------------------------------------
--- Current-state maintenance — the only writer of containers (Arch 8.2)
+-- Current-state maintenance: the only writer of containers (Arch 8.2)
 -- ---------------------------------------------------------------------------
 create or replace function apply_container_event() returns trigger
 language plpgsql security definer set search_path = public as $$

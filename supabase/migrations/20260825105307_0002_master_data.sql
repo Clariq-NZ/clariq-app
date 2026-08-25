@@ -1,4 +1,4 @@
--- Migration 0002: master data — Architecture 8.1
+-- Migration 0002: master data: Architecture 8.1
 -- customers, sites, products, chemical_batches, container_types
 
 create table customers (
