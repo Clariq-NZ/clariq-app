@@ -1,0 +1,10 @@
+{
+  "_comment": "Label geometry. OPEN ITEM: confirm against actual waterproof label stock before production print. All dimensions mm.",
+  "stock": "Avery L7165 / J8165 (placeholder)",
+  "page": { "w": 210, "h": 297 },
+  "label": { "w": 99.1, "h": 67.7 },
+  "grid": { "cols": 2, "rows": 4 },
+  "qr_mm": 36,
+  "pad_mm": 6,
+  "base_url": "https://app.clariq.nz/c/"
+}

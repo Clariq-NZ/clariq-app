@@ -1,0 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { background: theme('colors.paper'); color: theme('colors.ink.DEFAULT'); }
+  body { font-family: theme('fontFamily.body'); font-size: 16px; }
+  @media (prefers-color-scheme: dark) {
+    html { background: #17191C; color: #EDEBE6; }
+  }
+}

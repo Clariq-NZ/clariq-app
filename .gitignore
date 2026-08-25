@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+.env.*
+*.local
+clariq-labels-sample.pdf
