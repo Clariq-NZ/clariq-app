@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { inputCls, PrimaryButton } from '../components/ui'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /** Staff scan screen. Camera path uses BarcodeDetector where available;
  * the manual-entry path is always present and equally first-class, because
@@ -55,10 +56,9 @@ export default function ScanPage() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col px-5 pb-6 pt-safe">
-      <header className="py-4 text-center">
-        <div className="font-display font-semibold tracking-brand">CLARIQ</div>
-      </header>
+    <main className="min-h-dvh flex flex-col px-5 pb-6">
+      <BrandBar back="/dashboard" />
+      <div className="h-5" />
 
       <section className="relative rounded-2xl overflow-hidden bg-ink aspect-square max-w-md w-full mx-auto">
         {cameraState !== 'unavailable' && (
@@ -93,6 +93,7 @@ export default function ScanPage() {
         </div>
         <PrimaryButton disabled={manual.replace(/\D/g, '').length === 0}>Open container</PrimaryButton>
       </form>
+      <AppFooter />
     </main>
   )
 }

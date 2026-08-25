@@ -2,7 +2,8 @@
  * Every colour is a CSS variable set in styles/index.css, with light and dark
  * values, so no component ever hard-codes a surface or text colour. Functional
  * status colours are Okabe-Ito and are always paired with icon + label.
- * Accent: Clariq aqua, used for emphasis (counts, headings, active states). */
+ * Accent: Clariq Gold, used for emphasis and selected states, never body text.
+ * Brand source: Clariq Brand Guidelines v1.1. */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -16,6 +17,10 @@ export default {
           faint:   'rgb(var(--ink-faint) / <alpha-value>)',
         },
         line:    'rgb(var(--line) / <alpha-value>)',
+        bar: {
+          DEFAULT: 'rgb(var(--bar) / <alpha-value>)',
+          ink:     'rgb(var(--bar-ink) / <alpha-value>)',
+        },
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           ink:     'rgb(var(--accent-ink) / <alpha-value>)',
@@ -31,10 +36,11 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Archivo', 'system-ui', 'sans-serif'],
-        body: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Montserrat', 'Inter', 'system-ui', 'sans-serif'],
+        body: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       letterSpacing: { brand: '0.28em' },
+      borderRadius: { DEFAULT: '4px' },
       boxShadow: { card: '0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px -16px rgb(0 0 0 / 0.25)' },
     },
   },

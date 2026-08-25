@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { Navigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { applyMotif, Lockup } from '../components/Brand'
 
 /**
  * Authentication layer - Architecture section 5.
@@ -49,18 +50,28 @@ async function loadAppUser(userId: string): Promise<AppUser | null> {
   return { ...data, role_code: role_code ?? '' } as AppUser
 }
 
+/** Region motif from tenant settings (Architecture 14.1). Defaults to the fern. */
+async function loadMotif(tenantId: string | undefined) {
+  if (!supabase || !tenantId) { applyMotif('NZ_FERN'); return }
+  const { data } = await supabase.from('tenants').select('settings').eq('id', tenantId).maybeSingle()
+  const settings = (data?.settings ?? {}) as { region_motif?: string }
+  applyMotif(settings.region_motif ?? 'NZ_FERN')
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!!supabase && !demo)
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AppUser | null>(null)
 
   useEffect(() => {
-    if (!supabase || demo) return
+    if (!supabase || demo) { applyMotif('NZ_FERN'); return }
     let alive = true
     const apply = async (s: Session | null) => {
       if (!alive) return
       setSession(s)
-      setUser(s ? await loadAppUser(s.user.id) : null)
+      const u = s ? await loadAppUser(s.user.id) : null
+      setUser(u)
+      void loadMotif(u?.tenant_id)
       setLoading(false)
     }
     supabase.auth.getSession().then(({ data }) => apply(data.session))
@@ -105,7 +116,7 @@ function NotActivated({ email }: { email: string }) {
   const { signOut } = useAuth()
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10 text-center">
-      <div className="font-display font-semibold tracking-brand text-xl mb-8">CLARIQ</div>
+      <div className="bg-bar rounded px-5 py-3 mb-8"><Lockup className="h-7" /></div>
       <h1 className="text-2xl font-semibold mb-3">Signed in, not yet activated</h1>
       <p className="text-ink-soft max-w-sm mb-8">
         {email} has an account but no role yet. An administrator needs to activate it before

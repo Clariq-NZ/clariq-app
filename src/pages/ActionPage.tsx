@@ -4,6 +4,7 @@ import { gateway } from '../lib/supabaseGateway'
 import type { ContainerCard, EventType, Option } from '../lib/gateway'
 import type { ContainerStatus } from '../lib/status'
 import { Field, inputCls, PrimaryButton, Toggle } from '../components/ui'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /** One form per event type, holding to Architecture principle 2:
  * scan → choose action → minimum fields → submit. Field sets mirror
@@ -127,14 +128,10 @@ export default function ActionPage() {
   )
 
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-md mx-auto flex flex-col">
-      <header className="py-4 flex items-center justify-between">
-        <Link to={`/c/${card.code}`} className="text-ink-soft text-sm underline">‹ {card.code}</Link>
-        <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
-        <span className="w-10" aria-hidden />
-      </header>
+    <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto flex flex-col">
+      <BrandBar back={`/c/${card.code}`} />
 
-      <h1 className="font-display text-xl font-bold mb-5">{TITLES[ev] ?? ev}</h1>
+      <h1 className="font-display text-xl font-semibold mt-5 mb-5">{TITLES[ev] ?? ev}</h1>
 
       <form onSubmit={submit} className="flex-1 flex flex-col gap-4">
         {(ev === 'INITIAL_INSPECTION' || ev === 'INSPECTED') && (
@@ -318,6 +315,7 @@ export default function ActionPage() {
           </PrimaryButton>
         </div>
       </form>
+      <AppFooter />
     </main>
   )
 }

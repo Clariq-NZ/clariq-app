@@ -5,6 +5,7 @@ import type { Dashboard } from '../lib/gateway'
 import { STATUS_META, type ContainerStatus } from '../lib/status'
 import { useAuth } from '../lib/auth'
 import { CustomerPicker, useCustomerFilter, withCustomer } from '../lib/customerFilter'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /** Screen 1 - Today (Architecture 13). Overdue first, then fleet by status.
  * Every tile is a filter; every number can be tapped through to the
@@ -32,7 +33,7 @@ export default function DashboardPage() {
   const atRisk = overdueOnly.reduce((s, o) => s + o.replacementValue, 0)
 
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+    <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Header title="Today" />
 
       <div className="mb-5"><CustomerPicker /></div>
@@ -105,6 +106,7 @@ export default function DashboardPage() {
       </nav>
 
       {gateway.mode === 'demo' && <DemoBadge />}
+      <AppFooter />
     </main>
   )
 }
@@ -112,18 +114,15 @@ export default function DashboardPage() {
 export function Header({ title }: { title: string }) {
   const { user, signOut } = useAuth()
   return (
-    <header className="py-4 flex items-center justify-between">
-      <h1 className="font-display text-2xl font-bold">{title}</h1>
-      <div className="flex items-center gap-4">
-        {user && (
-          <button onClick={signOut} className="text-xs text-ink-soft underline min-h-[44px]"
-            aria-label={`Sign out ${user.display_name}`}>
-            {user.display_name.split(' ')[0]} · sign out
-          </button>
-        )}
-        <div className="font-display font-semibold tracking-brand text-sm text-accent">CLARIQ</div>
-      </div>
-    </header>
+    <>
+      <BrandBar right={user && (
+        <button onClick={signOut} className="text-xs text-bar-ink/80 underline min-h-[44px]"
+          aria-label={`Sign out ${user.display_name}`}>
+          Sign out
+        </button>
+      )} />
+      <h1 className="font-display text-2xl font-semibold pt-5 pb-3">{title}</h1>
+    </>
   )
 }
 

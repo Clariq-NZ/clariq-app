@@ -5,6 +5,7 @@ import type { CustomerReport, Option } from '../lib/gateway'
 import { buildCustomerReportPdf, buildLabelSheetPdf, download } from '../lib/pdf'
 import { Field, inputCls, PrimaryButton } from '../components/ui'
 import { DemoBadge } from './DashboardPage'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /** Stage 2/6 screens that run against the gateway, so they work in demo mode
  * today and against Supabase unchanged. */
@@ -177,14 +178,11 @@ export function GlossaryPage() {
 function Shell({ title, back, children }:
   { title: string; back: string; children: React.ReactNode }) {
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-md mx-auto">
-      <header className="py-4 flex items-center justify-between">
-        <Link to={back} className="text-ink-soft text-sm underline">&#8249; Back</Link>
-        <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
-        <span className="w-10" aria-hidden />
-      </header>
-      <h1 className="font-display text-xl font-bold mb-5">{title}</h1>
+    <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto">
+      <BrandBar back={back} />
+      <h1 className="font-display text-xl font-semibold mt-5 mb-5">{title}</h1>
       {children}
+      <AppFooter />
     </main>
   )
 }

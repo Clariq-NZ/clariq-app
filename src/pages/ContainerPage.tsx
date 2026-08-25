@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { ActionDef, ContainerCard } from '../lib/gateway'
 import { StatusChip } from '../components/ui'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /** The scan result: one card, one list of actions (Architecture 14, "Tone").
  * Actions come from the same transition table the database enforces, so this
@@ -107,13 +108,10 @@ function Item({ k, v }: { k: string; v: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-md mx-auto">
-      <header className="py-4 flex items-center justify-between">
-        <Link to="/scan" className="text-ink-soft text-sm underline">‹ Scan</Link>
-        <div className="font-display font-semibold tracking-brand text-sm">CLARIQ</div>
-        <span className="w-10" aria-hidden />
-      </header>
-      {children}
+    <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto">
+      <BrandBar back="/scan" />
+      <div className="mt-5">{children}</div>
+      <AppFooter />
     </main>
   )
 }

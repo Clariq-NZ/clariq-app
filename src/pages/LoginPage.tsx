@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Field, PrimaryButton, inputCls } from '../components/ui'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /**
  * Login - Architecture section 5. Magic link only; no passwords exist.
@@ -34,11 +35,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
-      <header className="mb-10 text-center">
-        <div className="font-display font-semibold tracking-brand text-xl">CLARIQ</div>
-        <div className="mt-1 text-xs tracking-[0.22em] text-ink-faint">STAFF SIGN IN</div>
-      </header>
+    <main className="min-h-dvh flex flex-col px-5 pb-6">
+      <BrandBar subtitle="STAFF SIGN IN" />
+      <div className="flex-1 flex flex-col items-center justify-center py-10">
 
       {sent ? (
         <section className="w-full max-w-sm text-center">
@@ -69,6 +68,8 @@ export default function LoginPage() {
           </p>
         </form>
       )}
+      </div>
+      <AppFooter />
     </main>
   )
 }

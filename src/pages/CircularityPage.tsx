@@ -6,6 +6,7 @@ import { STATUS_META, type ContainerStatus } from '../lib/status'
 import { StatusChip } from '../components/ui'
 import { DemoBadge } from './DashboardPage'
 import { CustomerPicker, useCustomerFilter, withCustomer } from '../lib/customerFilter'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /** Screen 2 - Circularity (Architecture 13, structured on the ISO 59020
  * groups in 10.6). Estimated figures carry the badge, always. Customer-facing
@@ -22,7 +23,7 @@ export function CircularityPage() {
   const c = d.circularity
 
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+    <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Back to={withCustomer('/dashboard', customerId)} label="Today" />
       <h1 className="font-display text-2xl font-bold mb-1">Circularity</h1>
       <p className="text-sm text-ink-soft mb-4">
@@ -60,6 +61,7 @@ export function CircularityPage() {
       </Group>
 
       {gateway.mode === 'demo' && <DemoBadge />}
+      <AppFooter />
     </main>
   )
 }
@@ -99,7 +101,7 @@ export function StatusListPage() {
   useEffect(() => { gateway.listByStatus(s, customerId || undefined).then(setRows) }, [s, customerId])
 
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+    <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Back to={withCustomer('/dashboard', customerId)} label="Today" />
       <div className="flex items-center justify-between mb-3">
         <h1 className="font-display text-2xl font-bold">{STATUS_META[s]?.label ?? s}</h1>
@@ -108,6 +110,7 @@ export function StatusListPage() {
       <div className="mb-4"><CustomerPicker /></div>
       <p className="text-sm text-ink-soft mb-3 tabular-nums">{rows.length} containers</p>
       <RowList rows={rows} />
+      <AppFooter />
     </main>
   )
 }
@@ -120,7 +123,7 @@ export function OverduePage() {
   if (!d) return null
 
   return (
-    <main className="min-h-dvh px-5 pb-28 pt-safe max-w-2xl mx-auto">
+    <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Back to={withCustomer('/dashboard', customerId)} label="Today" />
       <h1 className="font-display text-2xl font-bold mb-3">Overdue</h1>
       <div className="mb-4"><CustomerPicker /></div>
@@ -141,6 +144,7 @@ export function OverduePage() {
         ))}
         {!d.overdue.length && <p className="text-ink-soft">Nothing due or overdue.</p>}
       </ul>
+      <AppFooter />
     </main>
   )
 }
@@ -166,10 +170,6 @@ function RowList({ rows }: { rows: ContainerCard[] }) {
   )
 }
 
-function Back({ to, label }: { to: string; label: string }) {
-  return (
-    <header className="py-4">
-      <Link to={to} className="text-accent text-sm font-medium">‹ {label}</Link>
-    </header>
-  )
+function Back({ to }: { to: string; label: string }) {
+  return <div className="mb-5"><BrandBar back={to} /></div>
 }

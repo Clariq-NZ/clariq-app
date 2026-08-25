@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import { BrandBar, AppFooter } from '../components/Brand'
 
 /**
  * Public container page - Architecture section 7.
@@ -16,14 +17,9 @@ export default function PublicScanPage() {
   const valid = /^CLQ-\d{6}$/.test(id)
 
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
-      {/* Wordmark */}
-      <header className="mb-10 text-center">
-        <div className="font-display font-semibold tracking-brand text-xl">CLARIQ</div>
-        <div className="mt-1 text-xs tracking-[0.22em] text-ink-faint">
-          RETURN&nbsp;&bull;&nbsp;REUSE&nbsp;&bull;&nbsp;RECOVER
-        </div>
-      </header>
+    <main className="min-h-dvh flex flex-col px-5 pb-6">
+      <BrandBar subtitle="RETURN &bull; REUSE &bull; RECOVER" />
+      <div className="flex-1 flex flex-col items-center justify-center py-10">
 
       {/* Signature element: the container plate. Hexagonal frame echoes the
           Clariq mark; the ID is the hero because on this page identity IS the
@@ -67,6 +63,8 @@ export default function PublicScanPage() {
           Staff sign in
         </a>
       </footer>
+      </div>
+      <AppFooter />
     </main>
   )
 }

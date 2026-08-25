@@ -1,61 +1,67 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Clariq tokens. Light: charcoal on off-white paper (from the logo).
-   Dark: the same relationships inverted, tuned for a warehouse at night.
-   Accent: Clariq aqua, lifted in dark mode so it still reads. */
+/* Clariq brand tokens. Source: Clariq Brand Guidelines v1.1 sections 03 and 09.
+   Off Black 1D1D1B, Charcoal 525355, Stone White FAF9F6, Warm Silver BCBAB4,
+   Gold C9AC75. Values are RGB triplets so Tailwind can apply alpha.
+   Light: Off Black ink on Stone White. Dark: the same relationships inverted.
+   Gold is an accent for emphasis and selected states only, never body text. */
 @layer base {
   :root {
-    --paper: 246 245 242;
+    --paper: 250 249 246;        /* Stone White */
     --surface: 255 255 255;
-    --ink: 33 37 42;
-    --ink-soft: 74 80 87;
-    --ink-faint: 122 128 136;
-    --line: 221 219 213;
-    --accent: 14 140 140;
-    --accent-ink: 255 255 255;
-    --fern-opacity: 0.045;
+    --ink: 29 29 27;             /* Off Black */
+    --ink-soft: 82 83 85;        /* Charcoal */
+    --ink-faint: 122 123 125;
+    --line: 188 186 180;         /* Warm Silver */
+    --accent: 201 172 117;       /* Gold */
+    --accent-ink: 29 29 27;
+    --bar: 29 29 27;             /* header field, every screen */
+    --bar-ink: 250 249 246;
+    --motif-opacity: 0.10;
+    --motif-url: none;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --paper: 15 17 19;
-      --surface: 29 32 36;
-      --ink: 240 238 233;
-      --ink-soft: 196 200 205;
-      --ink-faint: 150 156 163;
-      --line: 52 56 62;
-      --accent: 63 193 192;
-      --accent-ink: 15 17 19;
-      --fern-opacity: 0.09;
+      --paper: 18 18 17;
+      --surface: 29 29 27;
+      --ink: 250 249 246;
+      --ink-soft: 188 186 180;
+      --ink-faint: 140 140 138;
+      --line: 58 58 56;
+      --accent: 201 172 117;
+      --accent-ink: 29 29 27;
+      --bar: 18 18 17;
+      --bar-ink: 250 249 246;
+      --motif-opacity: 0.09;
     }
   }
-  html {
-    background: rgb(var(--paper));
-    color: rgb(var(--ink));
-    min-height: 100%;
-  }
+  /* Region motif, chosen per tenant (Architecture 14.1). Set on <html>. */
+  html[data-motif='NZ_FERN'] { --motif-url: url('/motif-fern.svg'); --motif-pos: right -60px bottom -40px; --motif-size: 520px auto; }
+  html[data-motif='AU_GUM']  { --motif-url: url('/motif-gum.svg');  --motif-pos: right -40px top 40px;    --motif-size: 300px auto; }
+
+  html { background: rgb(var(--paper)); color: rgb(var(--ink)); min-height: 100%; }
   body {
     font-family: theme('fontFamily.body');
     font-size: 16px;
     min-height: 100dvh;
     position: relative;
   }
-  /* Silver fern: a single frond rising from the bottom right corner, fixed so
-     it does not scroll with content. Drawn in the ink colour at very low
-     opacity, so it sits behind everything in both themes. */
+  /* Motif sits fixed behind everything, drawn in the ink colour at low opacity.
+     Never behind forms or small text: those surfaces are opaque. */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    background-image: url('/fern.svg');
+    background-image: var(--motif-url);
     background-repeat: no-repeat;
-    background-position: right -60px bottom -40px;
-    background-size: 520px auto;
-    opacity: var(--fern-opacity);
+    background-position: var(--motif-pos, right bottom);
+    background-size: var(--motif-size, 400px auto);
+    opacity: var(--motif-opacity);
   }
   #root { position: relative; z-index: 1; }
   :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
