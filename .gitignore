@@ -6,3 +6,4 @@ dist/
 clariq-labels-sample.pdf
 .DS_Store
 .DS_Store
+/supabase/.temp
