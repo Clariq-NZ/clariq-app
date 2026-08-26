@@ -50,7 +50,7 @@ export default function PublicScanPage() {
           {/* return_instructions from tenant settings replaces this line at deploy */}
         </p>
         <p className="text-ink-soft leading-relaxed">
-          Questions? Contact Clariq and quote the container number above.
+          Questions? Email <a href="mailto:info@clariq.nz" className="underline text-ink">info@clariq.nz</a> and quote the container number above.
         </p>
       </section>
 
@@ -60,7 +60,7 @@ export default function PublicScanPage() {
           className="inline-block rounded-lg border border-line px-6 py-3 text-sm text-ink-soft
                      hover:border-ink-soft focus-visible:outline focus-visible:outline-2"
         >
-          Staff sign in
+          Sign in
         </a>
       </footer>
       </div>

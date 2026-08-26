@@ -27,7 +27,7 @@ const demo = new URLSearchParams(location.search).has('demo') || !hasBackend
 const staff = (el: React.ReactNode) => <RequireStaff>{el}</RequireStaff>
 
 const router = createBrowserRouter([
-  { path: '/', element: demo ? <DashboardPage /> : <PublicScanPage /> },
+  { path: '/', element: demo ? <DashboardPage /> : <LoginPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/dashboard', element: staff(<DashboardPage />) },
   { path: '/dashboard/circularity', element: staff(<CircularityPage />) },
