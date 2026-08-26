@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { friendlyError } from './errors'
 import { supabase } from './supabase'
 import type { ContainerStatus } from './status'
 import type { ActionDef, ContainerCard, CustomerReport, Dashboard, EventType, Gateway, Option, SubmitEvent } from './gateway'
@@ -184,6 +185,7 @@ function makeLive(sb: SupabaseClient): Gateway {
       }
     },
     async submitEvent(e: SubmitEvent) {
+      try {
       const { data: me } = await sb.from('app_users').select('tenant_id').eq('id', (await sb.auth.getUser()).data.user?.id ?? '').maybeSingle()
       const { error } = await sb.from('container_events').insert({
         tenant_id: (me as any)?.tenant_id,
@@ -198,7 +200,10 @@ function makeLive(sb: SupabaseClient): Gateway {
         payload: e.payload,
         notes: e.notes ?? null,
       })
-      return error ? { ok: false as const, error: error.message } : { ok: true as const }
+      return error ? { ok: false as const, error: friendlyError(error) } : { ok: true as const }
+      } catch (err) {
+        return { ok: false as const, error: friendlyError(err) }
+      }
     },
   }
 }

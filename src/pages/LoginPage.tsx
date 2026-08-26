@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { friendlyError } from '../lib/errors'
 import { Field, PrimaryButton, inputCls } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
 
@@ -26,12 +27,17 @@ export default function LoginPage() {
     e.preventDefault()
     if (!supabase) return
     setBusy(true); setError(null)
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${location.origin}${from}` },
-    })
-    setBusy(false)
-    if (error) setError(error.message); else setSent(true)
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: { emailRedirectTo: `${location.origin}${from}` },
+      })
+      if (error) setError(friendlyError(error)); else setSent(true)
+    } catch (err) {
+      setError(friendlyError(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

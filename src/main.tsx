@@ -11,9 +11,10 @@ import { CircularityPage, OverduePage, StatusListPage } from './pages/Circularit
 import { CreateContainersPage, GlossaryPage, ReportPage } from './pages/AdminPages'
 import MenuPage from './pages/MenuPage'
 import GuidePage from './pages/GuidePage'
+import AskPage from './pages/AskPage'
 import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
 import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
-import { AuthProvider, RequireStaff } from './lib/auth'
+import { AuthProvider, RequireStaff, RequireSignedIn } from './lib/auth'
 import { hasBackend } from './lib/supabase'
 import './styles/index.css'
 
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
   { path: '/report', element: staff(<ReportPage />) },
   { path: '/glossary', element: <GlossaryPage /> },
   { path: '/guide', element: <GuidePage /> },
+  { path: '/ask', element: <RequireSignedIn><AskPage /></RequireSignedIn> },
   { path: '/menu', element: staff(<MenuPage />) },
   { path: '/admin/customers', element: staff(<CustomersPage />) },
   { path: '/admin/customers/new', element: staff(<NewCustomerPage />) },

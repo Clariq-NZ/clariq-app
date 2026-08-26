@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { friendlyError } from '../lib/errors'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { Field, inputCls, PrimaryButton } from '../components/ui'
@@ -46,7 +47,7 @@ export function AuditHomePage() {
   const start = async (e: React.FormEvent) => {
     e.preventDefault()
     try { const s = await A.startSession(cust, site, expected ? Number(expected) : undefined); nav(`/audit/${s.id}`) }
-    catch (x: any) { setErr(x.message) }
+    catch (x: any) { setErr(friendlyError(x)) }
   }
   return (
     <Shell title="Audit" back="/menu">
@@ -164,7 +165,7 @@ export function SightingPage() {
       if (photo) await attachPhoto({ tenantId, containerId: c.id, eventId, file: photo })
       sessionStorage.setItem(`audit:${session}:loc`, locId)
       nav(`/audit/${session}`)
-    } catch (x: any) { setErr(x.message); setBusy(false) }
+    } catch (x: any) { setErr(friendlyError(x)); setBusy(false) }
   }
   const ready = condition && (loc || newLoc) && photo
   const L = labelsFor(s.customers?.location_labels)

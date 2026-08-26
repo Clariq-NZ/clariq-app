@@ -47,6 +47,7 @@ export default function MenuPage() {
         </Group>
       )}
       <Group title="HELP">
+        <Item to="/ask" label="Ask Clariq" sub="Legislation and safety questions, with the section cited" />
         <Item to="/guide" label="How to use Clariq" />
         <Item to="/glossary" label="Glossary" sub="Operational words to ISO 59004 terms" />
       </Group>

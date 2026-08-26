@@ -88,6 +88,17 @@ export default function ContainerPage() {
         ))}
       </section>
 
+      <section className="mt-6">
+        <button type="button"
+          onClick={() => nav(`/ask?container=${card.code}${card.productName ? `&product=${encodeURIComponent(card.productName)}` : ''}`, {
+            state: { context_text: contextText(card) },
+          })}
+          className="w-full min-h-[52px] rounded-xl border border-accent bg-accent/10 px-5 text-left font-medium flex items-center justify-between">
+          <span>Ask Clariq about this container</span>
+          <span className="text-ink-faint" aria-hidden>›</span>
+        </button>
+      </section>
+
       {gateway.mode === 'demo' && (
         <p className="mt-8 text-center text-xs text-ink-faint">
           Demo data - nothing here is saved.
@@ -95,6 +106,18 @@ export default function ContainerPage() {
       )}
     </Shell>
   )
+}
+
+/** Plain-text summary passed to Ask Clariq so answers can refer to the record. */
+function contextText(c: ContainerCard): string {
+  const lines = [
+    `Container ${c.code}, type ${c.typeCode}, ${c.capacityLitres} L, status ${c.status}.`,
+    c.productName ? `Product: ${c.productName}${c.batchCode ? `, batch ${c.batchCode}` : ''}.` : '',
+    c.customerName ? `With customer ${c.customerName}${c.siteName ? ` at ${c.siteName}` : ''}.` : '',
+    c.expectedReturnAt ? `Expected return ${c.expectedReturnAt}.` : '',
+    `Cycles completed ${c.completedCycles}.`,
+  ]
+  return lines.filter(Boolean).join(' ')
 }
 
 function Item({ k, v }: { k: string; v: string }) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { friendlyError } from '../lib/errors'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { Field, inputCls, PrimaryButton } from '../components/ui'
@@ -55,7 +56,7 @@ export function NewCustomerPage() {
     const t = await tenantId()
     const code = await nextCode('customers', 'CUS', 4)
     const { data, error } = await sb().from('customers').insert({ tenant_id: t, code, ...f, trading_name: f.trading_name || f.legal_name, account_status: 'ACTIVE', deposit_arrangement: 'NONE' }).select('id').single()
-    if (error) { setErr(error.message); return }
+    if (error) { setErr(friendlyError(error)); return }
     nav(`/admin/customers/${(data as any).id}`)
   }
   return (

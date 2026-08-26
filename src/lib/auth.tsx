@@ -114,6 +114,17 @@ export function RequireStaff({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+/** Any activated account, staff or customer. Used for Ask Clariq. */
+export function RequireSignedIn({ children }: { children: ReactNode }) {
+  const { loading, session, user } = useAuth()
+  const loc = useLocation()
+  if (!supabase || demo) return <>{children}</>
+  if (loading) return <Centered>Checking your session</Centered>
+  if (!session) return <Navigate to="/login" state={{ from: loc.pathname + loc.search }} replace />
+  if (!user) return <NotActivated email={session.user.email ?? ''} />
+  return <>{children}</>
+}
+
 function Centered({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-dvh flex items-center justify-center px-6 text-ink-faint">
