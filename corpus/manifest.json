@@ -1,0 +1,57 @@
+[
+  {
+    "file": "au/industrial-chemicals-act-2019.docx",
+    "title": "Industrial Chemicals Act 2019",
+    "jurisdiction": "AU",
+    "publisher": "Federal Register of Legislation",
+    "source_url": "https://www.legislation.gov.au/C2019A00012/latest/text",
+    "version": "Compilation No. 6",
+    "effective_from": "2024-10-14",
+    "licence": "CC BY 4.0",
+    "notes": "Includes amendments up to Act No. 39, 2024. Governs AICIS registration, categorisation and annual declarations."
+  },
+  {
+    "file": "au/model-whs-regulations.docx",
+    "title": "Model Work Health and Safety Regulations",
+    "jurisdiction": "AU",
+    "publisher": "Safe Work Australia",
+    "source_url": "https://www.safeworkaustralia.gov.au/doc/model-whs-regulations",
+    "version": "as at 5 December 2025",
+    "effective_from": "2025-12-05",
+    "licence": "CC BY 4.0",
+    "notes": "Model law with no legal effect of its own; each state and territory enacts its own version. Chapter 7 covers hazardous chemicals, registers, SDS and manifests."
+  },
+  {
+    "file": "au/model-whs-bill.pdf",
+    "title": "Model Work Health and Safety Bill",
+    "jurisdiction": "AU",
+    "publisher": "Safe Work Australia",
+    "source_url": "https://www.safeworkaustralia.gov.au/doc/model-whs-act",
+    "version": "as at 5 December 2025",
+    "effective_from": "2025-12-05",
+    "licence": "CC BY 4.0",
+    "notes": "Model law with no legal effect of its own. Parent Act for the Regulations above."
+  },
+  {
+    "file": "nz/hsno-act-1996.pdf",
+    "title": "Hazardous Substances and New Organisms Act 1996",
+    "jurisdiction": "NZ",
+    "publisher": "Parliamentary Counsel Office",
+    "source_url": "https://www.legislation.govt.nz/act/public/1996/0030/latest/whole.html",
+    "version": "172.0, as at 10 July 2026",
+    "effective_from": "2026-07-10",
+    "licence": "CC BY 4.0",
+    "notes": "Administered by the EPA. Substance approvals and group standards."
+  },
+  {
+    "file": "nz/hsw-hazardous-substances-regulations-2017.pdf",
+    "title": "Health and Safety at Work (Hazardous Substances) Regulations 2017",
+    "jurisdiction": "NZ",
+    "publisher": "Parliamentary Counsel Office",
+    "source_url": "https://www.legislation.govt.nz/regulation/public/2017/0131/latest/whole.html",
+    "version": "74.0, as at 30 July 2026",
+    "effective_from": "2026-07-30",
+    "licence": "CC BY 4.0",
+    "notes": "LI 2017/131, administered by MBIE, enforced by WorkSafe. Workplace inventory, SDS, certificates."
+  }
+]
