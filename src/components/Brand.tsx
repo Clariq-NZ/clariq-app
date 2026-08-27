@@ -41,7 +41,7 @@ export function AppFooter() {
   return (
     <footer className="mt-10 pt-3 border-t border-line flex justify-between text-xs text-ink-faint">
       <span>Clariq</span>
-      <span>v{__APP_VERSION__} &middot; {__APP_COMMIT__}</span>
+      <span title={`build ${__APP_COMMIT__}`}>v{__APP_VERSION__}</span>
     </footer>
   )
 }

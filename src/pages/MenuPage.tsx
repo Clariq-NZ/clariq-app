@@ -36,6 +36,7 @@ export default function MenuPage() {
       <Group title="REPORTS">
         <Item to="/dashboard/circularity" label="Circularity" />
         <Item to="/report" label="Customer report" />
+        <Item to="/report/inventory" label="Chemical inventory" sub="What is on a site, for the customer's register" />
         {admin && <Item to="/admin/view-as" label="View as a customer" sub="See exactly what they see" />}
       </Group>
       {admin && (

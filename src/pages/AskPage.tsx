@@ -25,7 +25,7 @@ export default function AskPage() {
   const [question, setQuestion] = useState('')
   const [turns, setTurns] = useState<Turn[]>([])
   const [busy, setBusy] = useState(false)
-  const bottom = useRef<HTMLDivElement>(null)
+  const answerRefs = useRef<(HTMLElement | null)[]>([])
 
   // Default jurisdiction from tenant settings unless the link said otherwise.
   useEffect(() => {
@@ -36,7 +36,13 @@ export default function AskPage() {
     })
   }, [user, params])
 
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth' }) }, [turns])
+  // When an answer arrives, bring the start of that exchange into view (not the feedback control).
+  useEffect(() => {
+    const last = turns.length - 1
+    if (last >= 0 && (turns[last].result || turns[last].error)) {
+      answerRefs.current[last]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [turns])
 
   const submit = async (q: string) => {
     const text = q.trim()
@@ -74,7 +80,7 @@ export default function AskPage() {
   )
 
   return (
-    <main className="min-h-dvh px-5 pb-40 max-w-md mx-auto">
+    <main className="min-h-dvh px-5 pb-56 max-w-md mx-auto">
       <BrandBar back={container ? `/c/${container}` : '/menu'} />
       <h1 className="font-display text-2xl font-semibold mt-5">Ask Clariq</h1>
       <p className="text-sm text-ink-soft mt-1 mb-4">
@@ -100,18 +106,17 @@ export default function AskPage() {
 
       <section className="space-y-5">
         {turns.map((t, i) => (
-          <article key={i}>
+          <article key={i} ref={el => { answerRefs.current[i] = el }} className="scroll-mt-4">
             <p className="rounded-xl bg-ink text-paper px-4 py-3 ml-8">{t.question}</p>
             {!t.result && !t.error && <p className="mt-3 text-ink-soft" aria-live="polite">Looking that up</p>}
             {t.error && <p className="mt-3 rounded-xl border border-status-overdue px-4 py-3">{t.error}</p>}
             {t.result && <Answer r={t.result} onFeedback={h => feedback(i, h)} feedback={t.feedback} />}
           </article>
         ))}
-        <div ref={bottom} />
       </section>
 
       <form onSubmit={e => { e.preventDefault(); void submit(question) }}
-        className="fixed bottom-0 left-0 right-0 bg-paper border-t border-line px-5 py-3">
+        className="fixed bottom-0 left-0 right-0 bg-paper border-t border-line px-5 pt-3 pb-16">
         <div className="max-w-md mx-auto flex gap-2">
           <input value={question} onChange={e => setQuestion(e.target.value)} className={inputCls}
             placeholder="Ask about a requirement, section or product" aria-label="Your question" disabled={busy} />

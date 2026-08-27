@@ -12,6 +12,7 @@ import { CreateContainersPage, GlossaryPage, ReportPage } from './pages/AdminPag
 import MenuPage from './pages/MenuPage'
 import GuidePage from './pages/GuidePage'
 import AskPage from './pages/AskPage'
+import InventoryReportPage from './pages/InventoryReportPage'
 import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
 import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
 import { AuthProvider, RequireStaff, RequireSignedIn } from './lib/auth'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
   { path: '/glossary', element: <GlossaryPage /> },
   { path: '/guide', element: <GuidePage /> },
   { path: '/ask', element: <RequireSignedIn><AskPage /></RequireSignedIn> },
+  { path: '/report/inventory', element: <RequireStaff><InventoryReportPage /></RequireStaff> },
   { path: '/menu', element: staff(<MenuPage />) },
   { path: '/admin/customers', element: staff(<CustomersPage />) },
   { path: '/admin/customers/new', element: staff(<NewCustomerPage />) },

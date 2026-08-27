@@ -134,7 +134,7 @@ export function SightingPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loc, setLoc] = useState(''); const [newLoc, setNewLoc] = useState<{ faculty: string; building: string; room: string; cabinet: string } | null>(null)
   const [condition, setCondition] = useState(''); const [product, setProduct] = useState(''); const [ownership, setOwnership] = useState('CUSTOMER')
-  const [capacity, setCapacity] = useState(''); const [notes, setNotes] = useState(''); const [description, setDescription] = useState('')
+  const [capacity, setCapacity] = useState(''); const [remaining, setRemaining] = useState(''); const [notes, setNotes] = useState(''); const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState<File | null>(null); const [preview, setPreview] = useState('')
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -161,6 +161,7 @@ export function SightingPage() {
       const payload: Record<string, unknown> = { condition, ownership }
       if (description) payload.description = description
       if (capacity) payload.capacity_litres = Number(capacity)
+      if (remaining) payload.quantity_remaining = Number(remaining)
       const { eventId, tenantId } = await A.recordSighting({ containerId: c.id, sessionId: session!, locationId: locId, productId: product || undefined, payload, notes: notes || undefined })
       if (photo) await attachPhoto({ tenantId, containerId: c.id, eventId, file: photo })
       sessionStorage.setItem(`audit:${session}:loc`, locId)
@@ -215,6 +216,7 @@ export function SightingPage() {
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Capacity (litres)"><input className={inputCls} inputMode="decimal" value={capacity} onChange={e => setCapacity(e.target.value)} /></Field>
+          <Field label="Quantity remaining (litres, if checked)"><input className={inputCls} inputMode="decimal" value={remaining} onChange={e => setRemaining(e.target.value)} /></Field>
           <Field label="Owned by">
             <select className={inputCls} value={ownership} onChange={e => setOwnership(e.target.value)}>
               <option value="CUSTOMER">Customer</option><option value="CLARIQ">Clariq</option><option value="THIRD_PARTY">Third party</option>

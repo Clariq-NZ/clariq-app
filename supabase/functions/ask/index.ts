@@ -29,8 +29,6 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type Refusal = { code: string; message: (j: string) => string };
-
 // Scope gate (20.4). Rules run before retrieval and before any model call.
 const REFUSALS: { code: string; test: RegExp; message: (j: string) => string }[] = [
   {
@@ -76,15 +74,12 @@ Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-  // Identify the caller from their JWT.
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error: authErr } = await userClient.auth.getUser();
-  if (authErr || !user) return json({ error: "Sign in to use Ask Clariq." }, 401);
-
+  // Identify the caller from their JWT. Verified against the service client so
+  // this does not depend on which anon/publishable key the runtime injects.
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const { data: { user }, error: authErr } = await admin.auth.getUser(jwt);
+  if (authErr || !user) return json({ error: "Sign in to use Ask Clariq." }, 401);
   const { data: appUser } = await admin
     .from("app_users")
     .select("id, tenant_id, customer_id, roles(code)")

@@ -160,6 +160,98 @@ export async function buildCustomerReportPdf(r: ReportData) {
   return doc.save()
 }
 
+export interface InventoryRow {
+  containerCode: string; typeCode: string; productName: string; batchCode: string | null
+  hazard: string; signalWord: string | null; quantity: number | null; basis: string; since: string
+}
+export interface InventoryReportData {
+  customerName: string; siteName: string; jurisdiction: 'AU' | 'NZ'; listingTerm: string; schemeTerm: string
+  preparedOn: string; rows: InventoryRow[]; unaccounted: string[]; audited: boolean
+  sds: { productName: string; version: string | null; issued: string | null; reviewDue: string | null; overdue: boolean }[]
+  demo?: boolean
+}
+
+/** Customer Chemical Inventory Report (Architecture 0.3, section 13.1). A4, as
+ * many pages as the listing needs. Wording rule 10.7.2 is fixed in the footer
+ * block: "prepared to support", never "compliant". */
+export async function buildInventoryReportPdf(r: InventoryReportData) {
+  const doc = await PDFDocument.create()
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const reg = await doc.embedFont(StandardFonts.Helvetica)
+  const logoBytes = await fetch(logoUrl).then(res => res.arrayBuffer())
+  const logo = await doc.embedPng(logoBytes)
+  const W = 210 * MM, H = 297 * MM, L = 16 * MM, R = 194 * MM
+  let page = doc.addPage([W, H]); let y = 0
+  const footer = () => page.drawText('RETURN \u2022 REUSE \u2022 RECOVER   |   clariq.nz   |   ' + r.listingTerm,
+    { x: L, y: 14 * MM, size: 8, font: reg, color: FAINT })
+  const newPage = () => { footer(); page = doc.addPage([W, H]); y = H - 20 * MM }
+  const text = (t: string, size: number, font = reg, color = INK, x = L) => {
+    if (y < 24 * MM) newPage()
+    page.drawText(t, { x, y, size, font, color }); y -= size * 1.55
+  }
+  const rule = () => page.drawLine({ start: { x: L, y: y + 3.2 * MM }, end: { x: R, y: y + 3.2 * MM }, thickness: 0.4, color: rgb(0.87, 0.86, 0.84) })
+
+  const lw = 42 * MM, lh = lw * (logo.height / logo.width)
+  page.drawImage(logo, { x: L, y: H - 16 * MM - lh, width: lw, height: lh })
+  y = H - 40 * MM
+  text(r.listingTerm.toUpperCase() + '  (CLARIQ-SUPPLIED PRODUCTS)', 8.5, reg, FAINT); y -= 2 * MM
+  text(r.customerName, 20, bold)
+  text(r.siteName, 12, reg, SOFT); y -= 1 * MM
+  text('Prepared ' + r.preparedOn + '   |   Jurisdiction: ' + (r.jurisdiction === 'AU' ? 'Australia' : 'New Zealand'), 9.5, reg, SOFT); y -= 5 * MM
+
+  // Summary
+  const qty = r.rows.reduce((a, x) => a + (x.quantity ?? 0), 0)
+  const byHazard = new Map<string, number>()
+  for (const x of r.rows) byHazard.set(x.hazard || 'Not classified', (byHazard.get(x.hazard || 'Not classified') ?? 0) + (x.quantity ?? 0))
+  text('Summary', 10, bold, SOFT)
+  text(`${r.rows.length} containers on site, ${new Set(r.rows.map(x => x.productName)).size} products, ${qty} L in total` +
+       (r.unaccounted.length ? `, ${r.unaccounted.length} unaccounted at last audit` : ''), 10)
+  for (const [h, q] of byHazard) text(`${h}: ${q} L`, 9.5, reg, SOFT, L + 4 * MM)
+  y -= 3 * MM
+
+  // Listing
+  text('Listing', 10, bold, SOFT)
+  const cols = [L, L + 26 * MM, L + 72 * MM, L + 112 * MM, L + 148 * MM, L + 168 * MM]
+  const head = ['Container', 'Product', 'Hazard', 'Batch', 'Qty (L)', 'Basis']
+  head.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: FAINT })); y -= 5 * MM
+  for (const x of r.rows) {
+    if (y < 26 * MM) { newPage(); head.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: FAINT })); y -= 5 * MM }
+    rule()
+    const cells = [x.containerCode, x.productName.slice(0, 26), x.hazard.slice(0, 22), x.batchCode ?? '', x.quantity == null ? '' : String(x.quantity), x.basis]
+    cells.forEach((c, i) => page.drawText(c, { x: cols[i], y, size: 8.5, font: i === 0 ? bold : reg, color: INK }))
+    y -= 6 * MM
+  }
+  if (r.unaccounted.length) {
+    y -= 2 * MM
+    text('Unaccounted at last audit: ' + r.unaccounted.join(', '), 9, bold, rgb(0.84, 0.37, 0))
+  }
+  y -= 4 * MM
+
+  // SDS status
+  text('Safety Data Sheets', 10, bold, SOFT)
+  for (const s of r.sds) {
+    text(`${s.productName}: ${s.version ? 'version ' + s.version : 'version not recorded'}` +
+         `${s.issued ? ', issued ' + s.issued : ''}${s.reviewDue ? ', review due ' + s.reviewDue : ''}${s.overdue ? '  (REVIEW OVERDUE)' : ''}`,
+         9, reg, s.overdue ? rgb(0.84, 0.37, 0) : SOFT)
+  }
+  y -= 4 * MM
+
+  // Basis and wording rule
+  text('Basis', 10, bold, SOFT)
+  const basisLines = r.audited
+    ? ['Quantities marked "audited" were sighted and recorded on site at the date shown. All other quantities are as',
+       'dispatched by Clariq; consumption after dispatch is not recorded unless an audit has been completed.']
+    : ['Quantities are as dispatched by Clariq. Consumption after dispatch is not recorded unless an audit has been',
+       'completed. Containers listed are those recorded as with the customer at the time of preparation.']
+  for (const l of basisLines) text(l, 8.5, reg, FAINT)
+  text('This document lists Clariq-supplied products only and is prepared to support the customer\'s own record-keeping', 8.5, reg, FAINT)
+  text('under ' + r.schemeTerm + '.', 8.5, reg, FAINT)
+  text('It is not a statement of compliance.', 8.5, reg, FAINT)
+  if (r.demo) { y -= 2 * MM; text('DEMONSTRATION DATA - not actual customer figures', 9, bold, rgb(0.85, 0.4, 0.35)) }
+  footer()
+  return doc.save()
+}
+
 export function download(bytes: Uint8Array, filename: string) {
   const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)
