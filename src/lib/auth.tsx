@@ -110,7 +110,20 @@ export function RequireStaff({ children }: { children: ReactNode }) {
   if (loading) return <Centered>Checking your session</Centered>
   if (!session) return <Navigate to="/login" state={{ from: loc.pathname }} replace />
   if (!user) return <NotActivated email={session.user.email ?? ''} />
-  if (user.role_code === 'CUSTOMER') return <Navigate to={`/public${loc.pathname}`} replace />
+  if (user.role_code === 'CUSTOMER') return <Navigate to="/dashboard" replace />
+  return <>{children}</>
+}
+
+/** Gate for screens a customer's own users may open: Today, the status and
+ * overdue lists, Circularity and the customer report. Their lens is locked to
+ * their customer (useCustomerFilter) and the database scopes every row. */
+export function RequireAccount({ children }: { children: ReactNode }) {
+  const { loading, session, user } = useAuth()
+  const loc = useLocation()
+  if (!supabase || demo) return <>{children}</>
+  if (loading) return <Centered>Checking your session</Centered>
+  if (!session) return <Navigate to="/login" state={{ from: loc.pathname + loc.search }} replace />
+  if (!user) return <NotActivated email={session.user.email ?? ''} />
   return <>{children}</>
 }
 

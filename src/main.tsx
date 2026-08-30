@@ -15,7 +15,7 @@ import AskPage from './pages/AskPage'
 import InventoryReportPage from './pages/InventoryReportPage'
 import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
 import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
-import { AuthProvider, RequireStaff, RequireSignedIn } from './lib/auth'
+import { AuthProvider, RequireAccount, RequireStaff, RequireSignedIn } from './lib/auth'
 import { hasBackend } from './lib/supabase'
 import './styles/index.css'
 
@@ -27,16 +27,17 @@ import './styles/index.css'
 
 const demo = new URLSearchParams(location.search).has('demo') || !hasBackend
 const staff = (el: React.ReactNode) => <RequireStaff>{el}</RequireStaff>
+const account = (el: React.ReactNode) => <RequireAccount>{el}</RequireAccount>
 
 const router = createBrowserRouter([
   { path: '/', element: demo ? <DashboardPage /> : <LoginPage /> },
   { path: '/login', element: <LoginPage /> },
-  { path: '/dashboard', element: staff(<DashboardPage />) },
-  { path: '/dashboard/circularity', element: staff(<CircularityPage />) },
-  { path: '/dashboard/overdue', element: staff(<OverduePage />) },
-  { path: '/dashboard/status/:status', element: staff(<StatusListPage />) },
+  { path: '/dashboard', element: account(<DashboardPage />) },
+  { path: '/dashboard/circularity', element: account(<CircularityPage />) },
+  { path: '/dashboard/overdue', element: account(<OverduePage />) },
+  { path: '/dashboard/status/:status', element: account(<StatusListPage />) },
   { path: '/admin/new-containers', element: staff(<CreateContainersPage />) },
-  { path: '/report', element: staff(<ReportPage />) },
+  { path: '/report', element: account(<ReportPage />) },
   { path: '/glossary', element: <GlossaryPage /> },
   { path: '/guide', element: <GuidePage /> },
   { path: '/ask', element: <RequireSignedIn><AskPage /></RequireSignedIn> },

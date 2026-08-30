@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { ContainerCard, Dashboard } from '../lib/gateway'
-import { STATUS_META, type ContainerStatus } from '../lib/status'
+import { statusLabel, type ContainerStatus } from '../lib/status'
 import { StatusChip } from '../components/ui'
 import { DemoBadge } from './DashboardPage'
-import { CustomerPicker, useCustomerFilter, withCustomer } from '../lib/customerFilter'
+import { CustomerPicker, useCustomerFilter, useCustomerLens, withCustomer } from '../lib/customerFilter'
 import { BrandBar, AppFooter } from '../components/Brand'
 
 /** Screen 2 - Circularity (Architecture 13, structured on the ISO 59020
@@ -97,6 +97,7 @@ export function StatusListPage() {
   const { status } = useParams()
   const s = status as ContainerStatus
   const [customerId] = useCustomerFilter()
+  const { customerView } = useCustomerLens()
   const [rows, setRows] = useState<ContainerCard[]>([])
   useEffect(() => { gateway.listByStatus(s, customerId || undefined).then(setRows) }, [s, customerId])
 
@@ -104,12 +105,12 @@ export function StatusListPage() {
     <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Back to={withCustomer('/dashboard', customerId)} label="Today" />
       <div className="flex items-center justify-between mb-3">
-        <h1 className="font-display text-2xl font-bold">{STATUS_META[s]?.label ?? s}</h1>
-        <StatusChip status={s} />
+        <h1 className="font-display text-2xl font-bold">{s ? statusLabel(s, customerView) : ''}</h1>
+        <StatusChip status={s} customerView={customerView} />
       </div>
       <div className="mb-4"><CustomerPicker /></div>
       <p className="text-sm text-ink-soft mb-3 tabular-nums">{rows.length} containers</p>
-      <RowList rows={rows} />
+      <RowList rows={rows} customerView={customerView} />
       <AppFooter />
     </main>
   )
@@ -149,7 +150,9 @@ export function OverduePage() {
   )
 }
 
-function RowList({ rows }: { rows: ContainerCard[] }) {
+/** Container number with its current product beside it (decision 2026-08-30),
+ * then who has it: for staff the customer, for a customer their own site. */
+function RowList({ rows, customerView }: { rows: ContainerCard[]; customerView?: boolean }) {
   return (
     <ul className="space-y-2">
       {rows.map(c => (
@@ -157,9 +160,12 @@ function RowList({ rows }: { rows: ContainerCard[] }) {
           <Link to={`/c/${c.code}`}
             className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3.5 shadow-card">
             <div>
-              <div className="font-display font-semibold text-accent">{c.code}</div>
+              <div className="font-display font-semibold text-accent">
+                {c.code}
+                {c.productName && <span className="ml-2 font-body font-medium text-ink">{c.productName}</span>}
+              </div>
               <div className="text-sm text-ink-soft">
-                {c.customerName ?? c.typeCode} · {c.completedCycles} cycles
+                {customerView ? (c.siteName ?? c.typeCode) : (c.customerName ?? c.typeCode)} · {c.completedCycles} cycles
               </div>
             </div>
             <span className="text-accent text-xl" aria-hidden>›</span>

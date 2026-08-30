@@ -14,7 +14,10 @@ export interface ContainerCard {
   customerName?: string
   siteName?: string
   productName?: string
+  productGroup?: string
   batchCode?: string
+  /** Product groups the container type is rated for (empty = unrestricted). */
+  compatibleGroups?: string[]
   fillCount: number
   returnCount: number
   completedCycles: number
@@ -23,7 +26,22 @@ export interface ContainerCard {
   conditionGrade?: string
 }
 
-export interface Option { id: string; label: string; sub?: string }
+export interface Option { id: string; label: string; sub?: string; group?: string }
+
+/** One use of a container: a FILLED event and, where they followed, the
+ * dispatch and return that closed that use. Product per use is history,
+ * never current state (decision 2026-08-30). */
+export interface FillRecord {
+  filledAt: string
+  productName: string
+  productGroup?: string
+  batchCode?: string
+  quantityL?: number
+  customerName?: string
+  siteName?: string
+  dispatchedAt?: string
+  returnedAt?: string
+}
 
 export type EventType =
   | 'INITIAL_INSPECTION' | 'FILLED' | 'DISPATCHED' | 'RETURN_REQUESTED'
@@ -88,6 +106,8 @@ export interface CustomerReport {
 export interface Gateway {
   readonly mode: 'demo' | 'live'
   getContainer(code: string): Promise<ContainerCard | null>
+  /** Fill history, newest first. */
+  getFillHistory(containerId: string): Promise<FillRecord[]>
   /** customerId narrows to containers currently assigned to that customer
    * (their history lives in getCustomerReport). */
   getDashboard(customerId?: string): Promise<Dashboard>

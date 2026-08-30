@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { friendlyError } from './errors'
 import { supabase } from './supabase'
 import type { ContainerStatus } from './status'
-import type { ActionDef, ContainerCard, CustomerReport, Dashboard, EventType, Gateway, Option, SubmitEvent } from './gateway'
+import type { ActionDef, ContainerCard, CustomerReport, Dashboard, EventType, FillRecord, Gateway, Option, SubmitEvent } from './gateway'
 import { demoGateway } from './demoGateway'
 
 /** Live gateway. The action list is read from allowed_transitions - the same
@@ -26,10 +26,10 @@ function makeLive(sb: SupabaseClient): Gateway {
         .from('containers')
         .select(`id, code, status, fill_count, return_count, completed_cycle_count,
                  expected_return_at, condition_grade, updated_at,
-                 container_types ( code, capacity_litres ),
+                 container_types ( code, capacity_litres, compatible_product_groups ),
                  customers:current_customer_id ( trading_name, legal_name ),
                  sites:current_site_id ( name ),
-                 products:current_product_id ( name ),
+                 products:current_product_id ( name, product_group ),
                  chemical_batches:current_batch_id ( code )`)
         .eq('code', code.toUpperCase())
         .maybeSingle()
@@ -41,16 +41,51 @@ function makeLive(sb: SupabaseClient): Gateway {
         customerName: d.customers?.trading_name ?? d.customers?.legal_name ?? undefined,
         siteName: d.sites?.name ?? undefined,
         productName: d.products?.name ?? undefined,
+        productGroup: d.products?.product_group ?? undefined,
         batchCode: d.chemical_batches?.code ?? undefined,
+        compatibleGroups: d.container_types?.compatible_product_groups ?? [],
         fillCount: d.fill_count, returnCount: d.return_count,
         completedCycles: d.completed_cycle_count,
         expectedReturnAt: d.expected_return_at ?? undefined,
         lastEventAt: d.updated_at, conditionGrade: d.condition_grade ?? undefined,
       }
     },
+    async getFillHistory(containerId): Promise<FillRecord[]> {
+      // One query over the container's own events; each FILLED opens a use,
+      // the next DISPATCHED and RETURNED (before the following FILLED) close it.
+      const { data } = await sb.from('container_events')
+        .select(`event_type, occurred_at, quantity, payload,
+                 products ( name, product_group ), chemical_batches ( code ),
+                 customers ( trading_name, legal_name ), sites ( name )`)
+        .eq('container_id', containerId)
+        .in('event_type', ['FILLED', 'DISPATCHED', 'RETURNED'])
+        .order('occurred_at', { ascending: true })
+      const out: FillRecord[] = []
+      for (const e of (data ?? []) as any[]) {
+        if (e.event_type === 'FILLED') {
+          out.push({
+            filledAt: e.occurred_at,
+            productName: e.products?.name ?? 'Unknown product',
+            productGroup: e.products?.product_group ?? undefined,
+            batchCode: e.chemical_batches?.code ?? undefined,
+            quantityL: e.quantity ?? (e.payload?.quantity_l != null ? Number(e.payload.quantity_l) : undefined),
+          })
+        } else if (out.length) {
+          const cur = out[out.length - 1]
+          if (e.event_type === 'DISPATCHED' && !cur.dispatchedAt) {
+            cur.dispatchedAt = e.occurred_at
+            cur.customerName = e.customers?.trading_name ?? e.customers?.legal_name ?? undefined
+            cur.siteName = e.sites?.name ?? undefined
+          } else if (e.event_type === 'RETURNED' && !cur.returnedAt) {
+            cur.returnedAt = e.occurred_at
+          }
+        }
+      }
+      return out.reverse()
+    },
     async listByStatus(status, customerId) {
       let q = sb.from('containers')
-        .select('id, code, status, fill_count, return_count, completed_cycle_count, expected_return_at, condition_grade, container_types ( code, capacity_litres ), customers:current_customer_id ( trading_name, legal_name )')
+        .select('id, code, status, fill_count, return_count, completed_cycle_count, expected_return_at, condition_grade, container_types ( code, capacity_litres ), customers:current_customer_id ( trading_name, legal_name ), sites:current_site_id ( name ), products:current_product_id ( name )')
         .eq('status', status)
       if (customerId) q = q.eq('current_customer_id', customerId)
       const { data } = await q.order('code')
@@ -58,6 +93,8 @@ function makeLive(sb: SupabaseClient): Gateway {
         id: d.id, code: d.code, status: d.status,
         typeCode: d.container_types?.code ?? '', capacityLitres: d.container_types?.capacity_litres ?? 0,
         customerName: d.customers?.trading_name ?? d.customers?.legal_name ?? undefined,
+        siteName: d.sites?.name ?? undefined,
+        productName: d.products?.name ?? undefined,
         fillCount: d.fill_count, returnCount: d.return_count,
         completedCycles: d.completed_cycle_count,
         expectedReturnAt: d.expected_return_at ?? undefined,
@@ -138,8 +175,8 @@ function makeLive(sb: SupabaseClient): Gateway {
       return (data ?? []).map((s: any) => ({ id: s.id, label: s.name }))
     },
     async listProducts() {
-      const { data } = await sb.from('products').select('id, name').eq('active', true)
-      return (data ?? []).map((p: any) => ({ id: p.id, label: p.name }))
+      const { data } = await sb.from('products').select('id, name, product_group').eq('active', true).order('name')
+      return (data ?? []).map((p: any) => ({ id: p.id, label: p.name, group: p.product_group ?? undefined }))
     },
     async listBatches(productId) {
       const { data } = await sb.from('chemical_batches').select('id, code').eq('product_id', productId).is('archived_at', null)

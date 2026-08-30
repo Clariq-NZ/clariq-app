@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build)
+**Version:** 0.2 (approved for build); build notes through 30 August 2026 in the decision log
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -531,3 +531,11 @@ Each stage ends with an update to this document.
 | 2026-08-24 | Label geometry externalised to `labels/label-spec.json` | Stock size/waterproof/adhesive unconfirmed; production print blocked until domain is live |
 | 2026-08-24 | Marketing one-pager wording follows the section 10.6 claim rule | "Prepared with reference to"; explicit no-certification line in the footer |
 | 2026-08-24 | Domain corrected: clariq.nz (app.clariq.nz), not clariq.co.nz | Owner correction; QR base URL, email domain and all documents updated |
+| 2026-08-30 | Product per use is history: the container card shows a fill history (one row per `FILLED` event, closed by the dispatch and return that followed) and the current product beside the container number on the card and in every list | Same container carries different products over its life (bleach, then BAC); the FILLED events already held it, the screens did not show it |
+| 2026-08-30 | `current_product_id` and `current_batch_id` clear at `WASHED` (and at `INSPECTED`), not at `RETURNED` | Residue is still relevant to the quick visual at return; the container is only empty once washed. Migration 0019 |
+| 2026-08-30 | Product-group change on a fill raises a warning, never a block; container-type `compatible_product_groups` is checked the same way | The state machine already forces wash and inspect between fills; the warning is the operator's cue, the database is not the judge of chemistry |
+| 2026-08-30 | Customer users sign in to Today, status lists, Overdue, Circularity and their own report; lens locked to their `customer_id`, no picker | Previously a customer sign-in bounced to a route that did not exist. `RequireAccount` gate; migration 0020 lets customers read their own events and tenant master data names |
+| 2026-08-30 | Customer-facing status labels: "With you", "Collection requested", "On its way back"; header shows customer name and locations | "With customer" is meaningless to the customer |
+| 2026-08-30 | Scan screen diagnoses camera failure (no https, permission denied, no camera, camera busy) and offers retry | A generic "not available" hid the cause during testing; plain http on a LAN address is the usual one |
+| 2026-08-30 | Every report: sections from one query result, exported as PDF and XLSX (sheet per section plus raw Events); by-location section when a customer has more than one site; customers can open their own Circularity figures | Customer request; XLSX and by-location land with the reporting batch |
+| 2026-08-30 | Hazard classes at product level, seeded with GHS Rev 7 classes and categories; identifiers CAS, AACN (AU), HSNO approval or group standard (NZ), UN number and DG class, GTIN, supplier code; capture by barcode scan, then pick-list, then manual; OCR deferred | AU and NZ both use GHS Rev 7; AICIS is keyed on CAS; the customer is a workplace holder, not an AICIS introducer, and report wording says so |

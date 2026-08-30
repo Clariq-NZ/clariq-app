@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
-import type { ContainerCard, EventType, Option } from '../lib/gateway'
+import type { ContainerCard, EventType, FillRecord, Option } from '../lib/gateway'
 import type { ContainerStatus } from '../lib/status'
 import { Field, inputCls, PrimaryButton, Toggle } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
@@ -21,6 +21,31 @@ const TITLES: Partial<Record<EventType, string>> = {
   VOIDED: 'Void this ID', NOTE: 'Add note',
 }
 
+/** Product-group check on a fill (decision 2026-08-30): a warning, never a
+ * block. The state machine already forces wash and inspect between fills;
+ * this is the operator's cue to double-check, not a rule the database holds. */
+function GroupWarning({ card, lastFill, chosen }:
+  { card: ContainerCard; lastFill: FillRecord | null; chosen?: Option }) {
+  if (!chosen?.group) return null
+  const notes: string[] = []
+  if (lastFill?.productGroup && lastFill.productGroup !== chosen.group)
+    notes.push(`Last fill was ${lastFill.productName} (${pretty(lastFill.productGroup)}). ${chosen.label} is ${pretty(chosen.group)}: confirm the wash and inspection cleared it for a different product group.`)
+  if (card.compatibleGroups?.length && !card.compatibleGroups.includes(chosen.group))
+    notes.push(`${card.typeCode} is rated for ${card.compatibleGroups.map(pretty).join(', ')}, not ${pretty(chosen.group)}.`)
+  if (!notes.length) return null
+  return (
+    <div role="status" className="flex gap-3 rounded-xl border border-status-processing bg-status-processing/10 px-4 py-3 text-sm">
+      <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0 text-status-processing" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" aria-hidden><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      <div className="space-y-1">
+        <div className="font-semibold">Check product change</div>
+        {notes.map(n => <p key={n}>{n}</p>)}
+      </div>
+    </div>
+  )
+}
+const pretty = (g: string) => g.toLowerCase().replace(/_/g, ' ')
+
 export default function ActionPage() {
   const { code, event } = useParams()
   const ev = event as EventType
@@ -33,6 +58,7 @@ export default function ActionPage() {
   const [batches, setBatches] = useState<Option[]>([])
   const [reasons, setReasons] = useState<Option[]>([])
   const [washMethods, setWashMethods] = useState<Option[]>([])
+  const [lastFill, setLastFill] = useState<FillRecord | null>(null)
 
   const [f, setF] = useState<Record<string, any>>({})
   const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }))
@@ -42,7 +68,10 @@ export default function ActionPage() {
   useEffect(() => {
     gateway.getContainer(code ?? '').then(setCard)
     if (ev === 'DISPATCHED') gateway.listCustomers().then(setCustomers)
-    if (ev === 'FILLED') gateway.listProducts().then(setProducts)
+    if (ev === 'FILLED') {
+      gateway.listProducts().then(setProducts)
+      gateway.getContainer(code ?? '').then(c => { if (c) gateway.getFillHistory(c.id).then(h => setLastFill(h[0] ?? null)) })
+    }
     if (ev === 'QUARANTINED') gateway.listReference('QUARANTINE_REASON').then(setReasons)
     if (ev === 'RETIRED') gateway.listReference('RETIREMENT_REASON').then(setReasons)
     if (ev === 'WASHED') gateway.listReference('WASH_METHOD').then(setWashMethods)
@@ -161,6 +190,7 @@ export default function ActionPage() {
         {ev === 'FILLED' && (
           <>
             <Field label="Product"><Select k="productId" options={products} placeholder="Choose product" /></Field>
+            <GroupWarning card={card} lastFill={lastFill} chosen={products.find(p => p.id === f.productId)} />
             {f.productId && <Field label="Batch"><Select k="batchId" options={batches} placeholder="Choose batch" /></Field>}
             <Field label="Quantity (litres)">
               <input className={inputCls} inputMode="decimal" value={f.quantity_l ?? ''}

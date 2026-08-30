@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { Dashboard } from '../lib/gateway'
-import { STATUS_META, type ContainerStatus } from '../lib/status'
+import { STATUS_META, statusLabel, type ContainerStatus } from '../lib/status'
 import { useAuth, setCustomerView } from '../lib/auth'
-import { CustomerPicker, useCustomerFilter, withCustomer } from '../lib/customerFilter'
+import { CustomerBanner, CustomerPicker, useCustomerFilter, useCustomerLens, withCustomer } from '../lib/customerFilter'
 import { BrandBar, AppFooter } from '../components/Brand'
 
 /** Screen 1 - Today (Architecture 13). Overdue first, then fleet by status.
@@ -27,8 +27,11 @@ export default function DashboardPage() {
   const [customerId] = useCustomerFilter()
   const [d, setD] = useState<Dashboard | null>(null)
   const [sp] = useSearchParams()
-  const customerView = sp.get('view') === 'customer'
-  useEffect(() => { if (customerView) setCustomerView(true) }, [customerView])
+  const lens = useCustomerLens()
+  const viewParam = sp.get('view') === 'customer'
+  useEffect(() => { if (viewParam) setCustomerView(true) }, [viewParam])
+  // A real customer user is always in customer view; an Admin is in it after "View as".
+  const customerView = viewParam || lens.customerView
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
 
   const overdueOnly = d?.overdue.filter(o => o.flag !== 'DUE_SOON') ?? []
@@ -40,9 +43,14 @@ export default function DashboardPage() {
       <Header title="Today" />
 
       {customerView ? (
-        <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">
-          Customer view. This is what the customer's own users see. <Link to="/dashboard" onClick={() => setCustomerView(false)} className="underline font-medium">Back to staff view</Link>
-        </p>
+        <div className="mb-5 space-y-3">
+          <CustomerBanner />
+          {!lens.isCustomerUser && (
+            <p className="rounded border border-accent bg-accent/15 px-4 py-3 text-sm">
+              Customer view. This is what the customer's own users see. <Link to="/dashboard" onClick={() => setCustomerView(false)} className="underline font-medium">Back to staff view</Link>
+            </p>
+          )}
+        </div>
       ) : <div className="mb-5"><CustomerPicker /></div>}
 
       {d && (
@@ -58,7 +66,7 @@ export default function DashboardPage() {
               </div>
               <div className="mt-1 text-sm font-medium">
                 {overdueOnly.length
-                  ? <>overdue · longest {overdueOnly[0].daysOutstanding} days ({overdueOnly[0].customerName})
+                  ? <>overdue · longest {overdueOnly[0].daysOutstanding} days{!customerView && <> ({overdueOnly[0].customerName})</>}
                       {atRisk > 0 && <> · ${atRisk.toFixed(0)} at risk</>}</>
                   : 'No overdue containers'}
               </div>
@@ -81,7 +89,7 @@ export default function DashboardPage() {
                     className={`rounded-xl border border-line bg-surface border-l-4 px-4 py-3 shadow-card
                                 ${GROUP_BORDER[meta.group]} active:bg-paper`}>
                     <div className="font-display text-3xl font-bold tabular-nums text-accent">{count}</div>
-                    <div className="mt-0.5 text-base font-medium text-ink leading-snug">{meta.label}</div>
+                    <div className="mt-0.5 text-base font-medium text-ink leading-snug">{statusLabel(s, customerView)}</div>
                   </Link>
                 )
               })}
@@ -103,6 +111,18 @@ export default function DashboardPage() {
         <Link to="/scan"
           className="flex-1 min-h-[52px] rounded-xl bg-accent text-accent-ink grid place-items-center font-semibold shadow-card">
           Scan
+        </Link>
+      </nav>}
+
+      {/* Customer view: their own circularity figures and report (decisions 3c, 3d). */}
+      {customerView && <nav className="mt-8 flex gap-2.5">
+        <Link to={withCustomer('/dashboard/circularity', customerId)}
+          className="flex-1 min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold text-ink shadow-card">
+          Circularity
+        </Link>
+        <Link to={withCustomer('/report', customerId)}
+          className="flex-1 min-h-[52px] rounded-xl bg-accent text-accent-ink grid place-items-center font-semibold shadow-card">
+          Your report
         </Link>
       </nav>}
 

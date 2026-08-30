@@ -1,5 +1,5 @@
 import type { ContainerStatus } from '../lib/status'
-import { STATUS_META } from '../lib/status'
+import { STATUS_META, statusLabel } from '../lib/status'
 
 /** Every status signal is colour + icon + text - never colour alone
  * (Architecture 14; the Admin is colour-blind). */
@@ -18,7 +18,8 @@ const ICONS: Record<string, JSX.Element> = {
   'plus-circle': <path d="M12 8v8m-4-4h8m9 0a9 9 0 11-18 0 9 9 0 0118 0z" />,
 }
 
-export function StatusChip({ status, size = 'md' }: { status: ContainerStatus; size?: 'md' | 'lg' }) {
+export function StatusChip({ status, size = 'md', customerView = false }:
+  { status: ContainerStatus; size?: 'md' | 'lg'; customerView?: boolean }) {
   const meta = STATUS_META[status]
   const dims = size === 'lg' ? 'text-base px-4 py-2 gap-2.5' : 'text-sm px-3 py-1.5 gap-2'
   return (
@@ -27,7 +28,7 @@ export function StatusChip({ status, size = 'md' }: { status: ContainerStatus; s
         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {ICONS[meta.icon]}
       </svg>
-      {meta.label}
+      {statusLabel(status, customerView)}
     </span>
   )
 }

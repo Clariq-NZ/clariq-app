@@ -9,13 +9,13 @@ export type ContainerStatus =
 
 type Group = 'ready' | 'out' | 'processing' | 'problem' | 'eol' | 'neutral'
 
-export const STATUS_META: Record<ContainerStatus, { label: string; group: Group; icon: string }> = {
+export const STATUS_META: Record<ContainerStatus, { label: string; group: Group; icon: string; customerLabel?: string }> = {
   NEW:                 { label: 'New',                 group: 'neutral',    icon: 'plus-circle' },
   IN_STOCK:            { label: 'In stock',            group: 'ready',      icon: 'check-circle' },
   FILLED:              { label: 'Filled',              group: 'ready',      icon: 'check-circle' },
-  WITH_CUSTOMER:       { label: 'With customer',       group: 'out',        icon: 'truck' },
-  RETURN_REQUESTED:    { label: 'Return requested',    group: 'out',        icon: 'truck' },
-  IN_TRANSIT:          { label: 'In transit',          group: 'out',        icon: 'truck' },
+  WITH_CUSTOMER:       { label: 'With customer',       group: 'out',        icon: 'truck', customerLabel: 'With you' },
+  RETURN_REQUESTED:    { label: 'Return requested',    group: 'out',        icon: 'truck', customerLabel: 'Collection requested' },
+  IN_TRANSIT:          { label: 'In transit',          group: 'out',        icon: 'truck', customerLabel: 'On its way back' },
   AWAITING_WASH:       { label: 'Awaiting wash',       group: 'processing', icon: 'refresh' },
   AWAITING_INSPECTION: { label: 'Awaiting inspection', group: 'processing', icon: 'refresh' },
   QUARANTINED:         { label: 'Quarantined',         group: 'problem',    icon: 'shield-alert' },
@@ -24,6 +24,13 @@ export const STATUS_META: Record<ContainerStatus, { label: string; group: Group;
   SENT_FOR_RECYCLING:  { label: 'Sent for recycling',  group: 'eol',        icon: 'archive' },
   RECYCLED:            { label: 'Recycled',            group: 'eol',        icon: 'archive' },
   VOID:                { label: 'Void',                group: 'eol',        icon: 'archive' },
+}
+
+/** Label for a status as a given viewer should read it. A customer's own
+ * containers are never "with customer"; they are with them. */
+export function statusLabel(status: ContainerStatus, customerView = false) {
+  const m = STATUS_META[status]
+  return (customerView && m.customerLabel) || m.label
 }
 
 /** ISO 59004 value-retention vocabulary (Architecture 9.2, 10.6) - used on

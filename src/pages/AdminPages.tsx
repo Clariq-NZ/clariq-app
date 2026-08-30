@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
+import { useCustomerLens } from '../lib/customerFilter'
 import type { CustomerReport, Option } from '../lib/gateway'
 import { buildCustomerReportPdf, buildLabelSheetPdf, download } from '../lib/pdf'
 import { Field, inputCls, PrimaryButton } from '../components/ui'
@@ -77,7 +78,11 @@ export function CreateContainersPage() {
 
 export function ReportPage() {
   const [customers, setCustomers] = useState<Option[]>([])
-  const [customerId, setCustomerId] = useState(new URLSearchParams(location.search).get('customer') ?? '')
+  // A customer user, or an Admin in "View as", has the lens locked: no picker,
+  // the only customer on offer is the one the lens is on (decision 3b).
+  const lens = useCustomerLens()
+  const [pickedId, setCustomerId] = useState(new URLSearchParams(location.search).get('customer') ?? '')
+  const customerId = lens.customerView ? (lens.customerId || pickedId) : pickedId
   const [period, setPeriod] = useState('Last 12 months')
   const [report, setReport] = useState<CustomerReport | null>(null)
 
@@ -107,12 +112,19 @@ export function ReportPage() {
   return (
     <Shell title="Customer report" back="/dashboard">
       <div className="space-y-4">
-        <Field label="Customer">
-          <select className={inputCls} value={customerId} onChange={e => setCustomerId(e.target.value)}>
-            <option value="" disabled>Choose customer</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </Field>
+        {lens.customerView ? (
+          <div className="rounded-xl border border-line bg-surface px-4 py-3">
+            <div className="text-xs tracking-[0.18em] text-ink-faint">REPORT FOR</div>
+            <div className="font-display text-lg font-semibold">{customers.find(c => c.id === customerId)?.label ?? '\u00a0'}</div>
+          </div>
+        ) : (
+          <Field label="Customer">
+            <select className={inputCls} value={customerId} onChange={e => setCustomerId(e.target.value)}>
+              <option value="" disabled>Choose customer</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Period">
           <select className={inputCls} value={period} onChange={e => setPeriod(e.target.value)}>
             {['This month', 'This quarter', 'This year', 'Last 12 months', 'All time']

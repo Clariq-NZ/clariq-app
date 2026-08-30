@@ -82,7 +82,40 @@ const reference: Record<string, Option[]> = {
 export const demoGateway: Gateway = {
   mode: 'demo',
   async getContainer(code) {
-    return fleet.get(code.toUpperCase()) ?? null
+    const c = fleet.get(code.toUpperCase())
+    if (!c) return null
+    const p = products.find(x => x.label === c.productName)
+    return { ...c, productGroup: p?.group, compatibleGroups: [] }
+  },
+  async getFillHistory(containerId) {
+    // Demo containers carry counters, not events; derive a plausible history
+    // so the card reads the same way it will against the live database.
+    const c = [...fleet.values()].find(x => x.id === containerId)
+    if (!c || !c.fillCount) return []
+    const n = c.fillCount
+    const day = 86400e3
+    const now = Date.now()
+    const rows = []
+    for (let i = 0; i < n; i++) {
+      const ordinal = n - i                     // 1 = first fill
+      const product = i === 0 && c.productName
+        ? products.find(p => p.label === c.productName) ?? products[0]
+        : products[(c.id.charCodeAt(c.id.length - 1) + ordinal) % products.length]
+      const filledAt = now - (i * 42 + 40) * day
+      const dispatched = filledAt + 2 * day
+      const closed = i > 0 || !['FILLED', 'WITH_CUSTOMER', 'RETURN_REQUESTED', 'IN_TRANSIT'].includes(c.status)
+      rows.push({
+        filledAt: new Date(filledAt).toISOString(),
+        productName: product.label, productGroup: product.group,
+        batchCode: batches[product.id]?.[0]?.label,
+        quantityL: c.capacityLitres,
+        customerName: c.customerName ?? customers[(ordinal) % customers.length]?.label,
+        siteName: c.siteName,
+        dispatchedAt: c.status === 'FILLED' && i === 0 ? undefined : new Date(dispatched).toISOString(),
+        returnedAt: closed ? new Date(dispatched + 28 * day).toISOString() : undefined,
+      })
+    }
+    return rows
   },
   async listByStatus(status, customerId) {
     return [...fleet.values()].filter(c => c.status === status && (!customerId || c.customerId === customerId))

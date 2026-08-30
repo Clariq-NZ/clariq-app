@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
-import type { ActionDef, ContainerCard } from '../lib/gateway'
+import type { ActionDef, ContainerCard, FillRecord } from '../lib/gateway'
 import { StatusChip } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
 
@@ -14,6 +14,7 @@ export default function ContainerPage() {
   const nav = useNavigate()
   const [card, setCard] = useState<ContainerCard | null | 'loading'>('loading')
   const [actions, setActions] = useState<ActionDef[]>([])
+  const [fills, setFills] = useState<FillRecord[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -21,7 +22,11 @@ export default function ContainerPage() {
       const c = await gateway.getContainer(code ?? '')
       if (cancelled) return
       setCard(c)
-      if (c) setActions(await gateway.getActions(c.status))
+      if (c) {
+        const [a, h] = await Promise.all([gateway.getActions(c.status), gateway.getFillHistory(c.id)])
+        if (cancelled) return
+        setActions(a); setFills(h)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -49,6 +54,8 @@ export default function ContainerPage() {
           <div>
             <div className="text-xs tracking-[0.2em] text-ink-faint">CONTAINER</div>
             <h1 className="font-display text-2xl font-bold tracking-wide">{card.code}</h1>
+            {/* Current product sits with the number (decision 2026-08-30). */}
+            {card.productName && <div className="text-base font-semibold text-ink leading-snug">{card.productName}</div>}
             <div className="text-sm text-ink-soft mt-0.5">{card.typeCode} · {card.capacityLitres} L</div>
           </div>
           <StatusChip status={card.status} />
@@ -65,7 +72,6 @@ export default function ContainerPage() {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[15px]">
           {card.customerName && <Item k="Customer" v={card.customerName} />}
           {card.siteName && <Item k="Site" v={card.siteName} />}
-          {card.productName && <Item k="Product" v={card.productName} />}
           {card.batchCode && <Item k="Batch" v={card.batchCode} />}
           {card.expectedReturnAt && !overdue && <Item k="Expected return" v={card.expectedReturnAt} />}
           {card.conditionGrade && <Item k="Condition" v={`Grade ${card.conditionGrade}`} />}
@@ -73,6 +79,32 @@ export default function ContainerPage() {
           <Item k="Fills / returns" v={`${card.fillCount} / ${card.returnCount}`} />
         </dl>
       </section>
+
+      {/* Product per use: every fill is a row, newest first. */}
+      {fills.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">Fill history</h2>
+          <ol className="rounded-2xl border border-line bg-surface divide-y divide-line">
+            {fills.map((f, i) => (
+              <li key={f.filledAt + i} className="px-4 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium">
+                    <span className="text-ink-faint tabular-nums mr-2">{ordinal(fills.length - i)}</span>
+                    {f.productName}
+                  </span>
+                  <span className="text-xs text-ink-faint tabular-nums shrink-0">{day(f.filledAt)}</span>
+                </div>
+                <div className="text-sm text-ink-soft mt-0.5">
+                  {[f.batchCode && `Batch ${f.batchCode}`, f.quantityL != null && `${f.quantityL} L`,
+                    f.customerName && `to ${f.customerName}${f.siteName ? `, ${f.siteName}` : ''}`,
+                    f.returnedAt ? `returned ${day(f.returnedAt)}` : f.dispatchedAt ? 'not yet returned' : 'not yet dispatched',
+                  ].filter(Boolean).join(' · ')}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {/* The actions */}
       <section className="mt-6 space-y-2.5">
@@ -119,6 +151,9 @@ function contextText(c: ContainerCard): string {
   ]
   return lines.filter(Boolean).join(' ')
 }
+
+const ordinal = (n: number) => `${n}${['th','st','nd','rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : Math.min(n % 10, 4) % 4] ?? 'th'}`
+const day = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
 
 function Item({ k, v }: { k: string; v: string }) {
   return (

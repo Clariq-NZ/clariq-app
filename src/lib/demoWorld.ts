@@ -39,9 +39,9 @@ export const DEMO_SITES: Record<string, Option[]> = {
 }
 
 export const DEMO_PRODUCTS: Option[] = [
-  { id: 'p1', label: 'Clariq Exterior 01' },
-  { id: 'p2', label: 'Clariq Interior 02' },
-  { id: 'p3', label: 'Clariq Roof & Gutter 03' },
+  { id: 'p1', label: 'Clariq Exterior 01', group: 'HYPOCHLORITE' },
+  { id: 'p2', label: 'Clariq Interior 02', group: 'QUATERNARY_AMMONIUM' },
+  { id: 'p3', label: 'Clariq Roof & Gutter 03', group: 'HYPOCHLORITE' },
 ]
 
 export const DEMO_BATCHES: Record<string, Option[]> = {
