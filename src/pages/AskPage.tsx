@@ -5,13 +5,17 @@ import { inputCls } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { ask, sendFeedback, suggestions, type AskResult, type Jurisdiction } from '../lib/ask'
+import { matchGuide, type GuideSection } from '../lib/guide'
+import { track } from '../lib/track'
+import { PageHead } from '../components/ui'
+import { Link } from 'react-router-dom'
 
 /** Ask Clariq (Architecture 0.3, section 20). One question box, answers with
  * numbered sources, the fixed disclaimer on every answer, and a feedback
  * control. Jurisdiction and context come from where the user tapped, so they
  * never have to choose a document. */
 
-type Turn = { question: string; result?: AskResult; error?: string; feedback?: boolean }
+type Turn = { question: string; result?: AskResult; error?: string; feedback?: boolean; guide?: GuideSection }
 
 export default function AskPage() {
   const { user } = useAuth()
@@ -48,6 +52,15 @@ export default function AskPage() {
     const text = q.trim()
     if (!text || busy) return
     setQuestion('')
+    // "How do I" questions answer from the in-app guide, instantly and with a
+    // link to the screen. The legislation corpus is for everything else.
+    const staff = !!user && user.role_code !== 'CUSTOMER'
+    const g = /how (do|can|should) i|where (do|is|can)|what do i|show me/i.test(text) ? matchGuide(text, staff) : null
+    if (g) {
+      track('guide_match', '/ask', { section: g.id })
+      setTurns(t => [...t, { question: text, guide: g }])
+      return
+    }
     setBusy(true)
     setTurns(t => [...t, { question: text }])
     try {
@@ -82,9 +95,9 @@ export default function AskPage() {
   return (
     <main className="min-h-dvh px-5 pb-56 max-w-md mx-auto">
       <BrandBar back={container ? `/c/${container}` : '/menu'} />
-      <h1 className="font-display text-2xl font-semibold mt-5">Ask Clariq</h1>
-      <p className="text-sm text-ink-soft mt-1 mb-4">
-        Answers come only from the legislation and safety documents Clariq holds, with the section cited.
+      <PageHead title="Ask Clariq" purpose="How do I, or what does the law say. Plain words are fine." help="ask" />
+      <p className="text-sm text-ink-faint -mt-1 mb-4">
+        Legal answers come only from the legislation and safety documents Clariq holds, with the section cited.
         {container && <> Asking about <span className="font-medium">{container}</span>.</>}
       </p>
 
@@ -94,7 +107,16 @@ export default function AskPage() {
 
       {turns.length === 0 && (
         <section className="space-y-2 mb-6">
-          <h2 className="text-xs tracking-[0.18em] text-ink-faint">TRY ONE OF THESE</h2>
+          <h2 className="text-xs tracking-[0.18em] text-ink-faint">HOW DO I</h2>
+          {(user?.role_code === 'CUSTOMER'
+            ? ['How do I see what is in a container?', 'How do I get my report?']
+            : ['How do I record a wash?', 'How do I print new labels?', 'How do I see what is overdue for return?']).map(s => (
+            <button key={s} type="button" onClick={() => submit(s)}
+              className="w-full min-h-[52px] rounded-xl border border-line bg-surface px-4 text-left">
+              {s}
+            </button>
+          ))}
+          <h2 className="text-xs tracking-[0.18em] text-ink-faint pt-3">WHAT DOES THE LAW SAY</h2>
           {suggestions(jurisdiction, { container, product }).map(s => (
             <button key={s} type="button" onClick={() => submit(s)}
               className="w-full min-h-[52px] rounded-xl border border-line bg-surface px-4 text-left">
@@ -108,7 +130,17 @@ export default function AskPage() {
         {turns.map((t, i) => (
           <article key={i} ref={el => { answerRefs.current[i] = el }} className="scroll-mt-4">
             <p className="rounded-xl bg-ink text-paper px-4 py-3 ml-8">{t.question}</p>
-            {!t.result && !t.error && <p className="mt-3 text-ink-soft" aria-live="polite">Looking that up</p>}
+            {t.guide && (
+              <div className="mt-3 rounded-xl border border-line bg-surface px-4 py-3">
+                <p className="font-semibold">{t.guide.title}</p>
+                <ol className="list-decimal pl-5 mt-2 space-y-1.5">{t.guide.steps.map((st, k) => <li key={k}>{st}</li>)}</ol>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                  {t.guide.path && <Link to={t.guide.path} className="min-h-[40px] px-4 rounded-full bg-accent text-accent-ink font-medium inline-flex items-center">Take me there</Link>}
+                  <Link to={`/guide#${t.guide.id}`} className="min-h-[40px] px-4 rounded-full border border-line inline-flex items-center">Show me how</Link>
+                </div>
+              </div>
+            )}
+            {!t.result && !t.error && !t.guide && <p className="mt-3 text-ink-soft" aria-live="polite">Looking that up</p>}
             {t.error && <p className="mt-3 rounded-xl border border-status-overdue px-4 py-3">{t.error}</p>}
             {t.result && <Answer r={t.result} onFeedback={h => feedback(i, h)} feedback={t.feedback} />}
           </article>

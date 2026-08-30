@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BrandBar, AppFooter } from '../components/Brand'
-import { inputCls } from '../components/ui'
+import { ExportBar, inputCls, PageHead } from '../components/ui'
+import { buildInventoryXlsx } from '../lib/xlsx'
 import { CustomerPicker, useCustomerFilter } from '../lib/customerFilter'
 import { gateway } from '../lib/supabaseGateway'
 import { supabase } from '../lib/supabase'
 import { friendlyError } from '../lib/errors'
 import { buildInventoryReportPdf, download, type InventoryRow } from '../lib/pdf'
 import type { Option } from '../lib/gateway'
+import { fmtDate, fileStamp } from '../lib/dates'
 
 /** Customer Chemical Inventory Report (Architecture 0.3, section 13.1).
  * One site at a time. Rows come from v_site_inventory: as-dispatched by
@@ -23,7 +25,7 @@ type Row = {
 }
 type Term = { code: string; label: string }
 
-const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+const fmt = (d: string | null) => fmtDate(d)
 
 export default function InventoryReportPage() {
   const [customerId] = useCustomerFilter()
@@ -35,7 +37,7 @@ export default function InventoryReportPage() {
   const [customerName, setCustomerName] = useState('')
   const [unaccounted, setUnaccounted] = useState<string[]>([])
   const [err, setErr] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
 
   useEffect(() => {
     if (!customerId) { setSites([]); setSiteId(''); return }
@@ -79,9 +81,17 @@ export default function InventoryReportPage() {
   const totalQty = view.reduce((a, r) => a + (r.quantity ?? 0), 0)
   const siteName = sites.find(s => s.id === siteId)?.label ?? ''
 
+  const stem = () => `Clariq-inventory-${siteName.replace(/\s+/g, '-')}-${fileStamp()}`
+  const exportXlsx = () => {
+    if (!rows) return
+    setBusy('xlsx')
+    try {
+      download(buildInventoryXlsx({ customerName, siteName, schemeTerm: term('SCHEME') || 'the applicable legislation', rows: view, unaccounted, demo: gateway.mode === 'demo' }), stem() + '.xlsx')
+    } catch (e) { setErr(friendlyError(e)) } finally { setBusy(null) }
+  }
   const exportPdf = async () => {
     if (!rows) return
-    setBusy(true)
+    setBusy('pdf')
     try {
       const products = new Map<string, Row>()
       for (const r of rows) if (r.product_name && !products.has(r.product_name)) products.set(r.product_name, r)
@@ -94,15 +104,14 @@ export default function InventoryReportPage() {
         })),
         demo: gateway.mode === 'demo',
       })
-      download(bytes, `Clariq-inventory-${siteName.replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.pdf`)
-    } catch (e) { setErr(friendlyError(e)) } finally { setBusy(false) }
+      download(bytes, stem() + '.pdf')
+    } catch (e) { setErr(friendlyError(e)) } finally { setBusy(null) }
   }
 
   return (
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
       <BrandBar back="/menu" />
-      <h1 className="font-display text-2xl font-semibold mt-5">Chemical inventory</h1>
-      <p className="text-sm text-ink-soft mt-1 mb-4">Clariq-supplied products on a site, in the form of the {term('INVENTORY').toLowerCase() || 'site inventory'}.</p>
+      <PageHead title="Chemicals on site" purpose={`What is at a location right now, in the form of the ${term('INVENTORY').toLowerCase() || 'site inventory'}, ready for the customer's own register.`} help="reports" />
 
       <div className="space-y-3 mb-5">
         <CustomerPicker />
@@ -138,10 +147,7 @@ export default function InventoryReportPage() {
             {view.length === 0 && <li className="py-3 text-ink-soft">No Clariq containers recorded on this site.</li>}
           </ul>
 
-          <button type="button" onClick={exportPdf} disabled={busy || view.length === 0}
-            className="mt-6 w-full min-h-[52px] rounded-xl bg-accent text-accent-ink font-semibold disabled:opacity-40">
-            {busy ? 'Preparing PDF' : 'Download PDF'}
-          </button>
+          <div className="mt-6"><ExportBar onPdf={exportPdf} onXlsx={exportXlsx} busy={busy} disabled={view.length === 0} /></div>
           <p className="mt-3 text-xs text-ink-faint">Prepared to support the customer's own record-keeping under {term('SCHEME') || 'the applicable legislation'}. Not a statement of compliance.</p>
         </>
       )}

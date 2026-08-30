@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom'
 import type { ContainerStatus } from '../lib/status'
+import { track } from '../lib/track'
 import { STATUS_META, statusLabel } from '../lib/status'
 
 /** Every status signal is colour + icon + text - never colour alone
@@ -71,5 +73,75 @@ export function PrimaryButton({ children, disabled, onClick }:
                  disabled:opacity-40 focus-visible:outline focus-visible:outline-2">
       {children}
     </button>
+  )
+}
+
+/** The same two export buttons on every report, staff and customer alike:
+ * PDF for the reader, XLSX for the analyst (decision 2026-08-30). */
+export function ExportBar({ onPdf, onXlsx, busy, disabled }:
+  { onPdf: () => void; onXlsx: () => void; busy?: string | null; disabled?: boolean }) {
+  return (
+    <div className="grid grid-cols-2 gap-2.5">
+      <button type="button" onClick={onPdf} disabled={disabled || !!busy}
+        className="min-h-[52px] rounded-xl bg-accent text-accent-ink font-semibold disabled:opacity-40">
+        {busy === 'pdf' ? 'Preparing PDF' : 'Download PDF'}
+      </button>
+      <button type="button" onClick={onXlsx} disabled={disabled || !!busy}
+        className="min-h-[52px] rounded-xl border border-line bg-surface text-ink font-semibold disabled:opacity-40">
+        {busy === 'xlsx' ? 'Preparing XLSX' : 'Download XLSX'}
+      </button>
+    </div>
+  )
+}
+
+/** Every screen says what it is for (decision 2026-08-30): a title, a
+ * one-line purpose, and a help mark that opens the matching guide section. */
+export function PageHead({ title, purpose, help }: { title: string; purpose?: string; help?: string }) {
+  return (
+    <div className="pt-5 pb-3">
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="font-display text-2xl font-semibold">{title}</h1>
+        {help && <HelpButton section={help} />}
+      </div>
+      {purpose && <p className="text-sm text-ink-soft mt-0.5">{purpose}</p>}
+    </div>
+  )
+}
+
+export function HelpButton({ section }: { section: string }) {
+  return (
+    <Link to={`/guide#${section}`} onClick={() => track('help_open', location.pathname, { section })}
+      aria-label="How this screen works"
+      className="shrink-0 mt-1 w-9 h-9 rounded-full border border-line bg-surface grid place-items-center font-display font-bold text-ink-soft">
+      ?
+    </Link>
+  )
+}
+
+/** An empty list that teaches instead of staying blank. */
+export function EmptyState({ text, to, cta }: { text: string; to?: string; cta?: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-line px-5 py-8 text-center">
+      <p className="text-ink-soft">{text}</p>
+      {to && cta && <Link to={to} className="inline-block mt-4 min-h-[48px] px-5 rounded-xl bg-accent text-accent-ink font-semibold leading-[48px]">{cta}</Link>}
+    </div>
+  )
+}
+
+/** A big verb button and up to three doors under it. */
+export function BigButton({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link to={to} onClick={() => track('door', to, { big: true })}
+      className="block w-full min-h-[72px] rounded-2xl bg-accent text-accent-ink font-display text-xl font-bold grid place-items-center shadow-card">
+      {children}
+    </Link>
+  )
+}
+export function Door({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link to={to} onClick={() => track('door', to)}
+      className="min-h-[64px] rounded-xl border border-line bg-surface grid place-items-center text-center px-2 font-semibold leading-tight shadow-card active:bg-paper">
+      {children}
+    </Link>
   )
 }

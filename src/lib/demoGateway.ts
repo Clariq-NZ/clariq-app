@@ -14,6 +14,7 @@ const TRANSITIONS: T[] = [
   ['INITIAL_INSPECTION', 'NEW', 'QUARANTINED'],
   ['FILLED', 'IN_STOCK', 'FILLED'],
   ['DISPATCHED', 'FILLED', 'WITH_CUSTOMER'],
+  ['DELIVERED', 'WITH_CUSTOMER', 'WITH_CUSTOMER'],
   ['RETURN_REQUESTED', 'WITH_CUSTOMER', 'RETURN_REQUESTED'],
   ['COLLECTED', 'WITH_CUSTOMER', 'IN_TRANSIT'],
   ['COLLECTED', 'RETURN_REQUESTED', 'IN_TRANSIT'],
@@ -50,6 +51,7 @@ const ACTION_LABELS: Record<EventType, string> = {
   INITIAL_INSPECTION: 'Initial inspection',
   FILLED: 'Fill',
   DISPATCHED: 'Dispatch',
+  DELIVERED: 'Log delivery',
   RETURN_REQUESTED: 'Request return',
   COLLECTED: 'Collect',
   RETURNED: 'Return',
@@ -206,6 +208,25 @@ export const demoGateway: Gateway = {
     const returns = Math.round(all.reduce((s, c) => s + c.returnCount, 0) * share)
     const rotations = Math.round(all.reduce((s, c) => s + c.completedCycles, 0) * share)
     const avoided = Math.round(all.reduce((s, c) => s + Math.max(c.completedCycles - 1, 0) * (DEMO_TYPE_WEIGHT[c.typeCode] ?? 0), 0) * share)
+    // By location: split the customer's figures across its demo sites in
+    // proportion to the containers currently at each.
+    const siteList = sites[customerId] ?? []
+    const perSite = siteList.map((st, i) => {
+      const assigned = mine.filter(c => c.siteName === st.label).length
+      const w = siteList.length ? (assigned || 1) / Math.max(mine.length, siteList.length) : 1
+      const sup = Math.round(fills * w), ret = Math.min(sup, Math.round(returns * w))
+      void i
+      return { siteName: st.label, containersAssigned: assigned, suppliedTotal: sup, returnedTotal: ret,
+        returnRatePct: sup ? Math.round((ret / sup) * 1000) / 10 : 0, completedRotations: ret }
+    })
+    const day = 86400e3
+    const events = mine.flatMap((c, i) => {
+      const t = Date.now() - (i * 9 + 30) * day
+      return [
+        { occurredAt: new Date(t).toISOString(), containerCode: c.code, eventType: 'DISPATCHED', siteName: c.siteName, productName: c.productName, quantityL: c.capacityLitres },
+        ...(c.returnCount ? [{ occurredAt: new Date(t + 26 * day).toISOString(), containerCode: c.code, eventType: 'RETURNED', siteName: c.siteName }] : []),
+      ]
+    }).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
     return {
       customerName: name, periodLabel,
       containersAssigned: mine.length,
@@ -215,6 +236,7 @@ export const demoGateway: Gateway = {
       avgRotations: mine.length ? Math.round((rotations / Math.max(mine.length, 1)) * 10) / 10 : 0,
       packagingAvoidedG: avoided,
       massRecoveredG: Math.round(avoided * 0.11),
+      sites: perSite, events,
     }
   },
   async listSites(customerId) { return sites[customerId] ?? [] },

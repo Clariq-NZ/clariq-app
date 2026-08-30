@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
+import { fileStamp } from '../lib/dates'
 import { useCustomerLens } from '../lib/customerFilter'
-import type { CustomerReport, Option } from '../lib/gateway'
+import { REPORT_PERIODS, type CustomerReport, type Option } from '../lib/gateway'
+import { buildCustomerReportXlsx } from '../lib/xlsx'
 import { buildCustomerReportPdf, buildLabelSheetPdf, download } from '../lib/pdf'
-import { Field, inputCls, PrimaryButton } from '../components/ui'
+import { ExportBar, Field, inputCls, PageHead, PrimaryButton } from '../components/ui'
 import { DemoBadge } from './DashboardPage'
 import { BrandBar, AppFooter } from '../components/Brand'
 
@@ -33,7 +35,7 @@ export function CreateContainersPage() {
   }
 
   return (
-    <Shell title="New containers" back="/dashboard">
+    <Shell title="Print new labels" back="/dashboard" purpose="Create container IDs and download a label sheet to print." help="labels">
       {!created ? (
         <form onSubmit={submit} className="space-y-4">
           <Field label="Container type">
@@ -92,10 +94,19 @@ export function ReportPage() {
     else setReport(null)
   }, [customerId, period])
 
+  const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
+  const stem = () => `Clariq-report-${report!.customerName.replace(/\W+/g, '-')}-${fileStamp()}`
   async function pdf() {
     if (!report) return
-    const bytes = await buildCustomerReportPdf({ ...report, demo: gateway.mode === 'demo' })
-    download(bytes, `clariq-report-${report.customerName.replace(/\W+/g, '-')}.pdf`)
+    setBusy('pdf')
+    try { download(await buildCustomerReportPdf({ ...report, demo: gateway.mode === 'demo' }), stem() + '.pdf') }
+    finally { setBusy(null) }
+  }
+  function xlsx() {
+    if (!report) return
+    setBusy('xlsx')
+    try { download(buildCustomerReportXlsx({ ...report, demo: gateway.mode === 'demo' }), stem() + '.xlsx') }
+    finally { setBusy(null) }
   }
 
   const rows: [string, string, boolean?][] = report ? [
@@ -110,7 +121,8 @@ export function ReportPage() {
   ] : []
 
   return (
-    <Shell title="Customer report" back="/dashboard">
+    <Shell title={lens.customerView ? 'My report' : 'Report for a customer'} back="/dashboard"
+      purpose={lens.customerView ? 'Your reuse figures for any period, as a PDF or a spreadsheet.' : 'Reuse figures for one customer and period, with a by-location breakdown for multi-site customers.'} help="reports">
       <div className="space-y-4">
         {lens.customerView ? (
           <div className="rounded-xl border border-line bg-surface px-4 py-3">
@@ -127,8 +139,7 @@ export function ReportPage() {
         )}
         <Field label="Period">
           <select className={inputCls} value={period} onChange={e => setPeriod(e.target.value)}>
-            {['This month', 'This quarter', 'This year', 'Last 12 months', 'All time']
-              .map(p => <option key={p}>{p}</option>)}
+            {REPORT_PERIODS.map(p => <option key={p}>{p}</option>)}
           </select>
         </Field>
 
@@ -145,10 +156,28 @@ export function ReportPage() {
                 </div>
               ))}
             </section>
+            {/* By location: only when there is somewhere to break down to.
+                The summary above is always all locations together. */}
+            {report.sites.length > 1 && (
+              <section>
+                <h2 className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">By location</h2>
+                <div className="rounded-2xl border border-line bg-surface divide-y divide-line">
+                  {report.sites.map(st => (
+                    <div key={st.siteName} className="px-4 py-3">
+                      <div className="font-medium">{st.siteName}</div>
+                      <div className="text-sm text-ink-soft tabular-nums">
+                        {st.containersAssigned} assigned · {st.suppliedTotal} supplied · {st.returnedTotal} returned · {st.returnRatePct}% return rate
+                      </div>
+                    </div>
+                  ))}
+                  <div className="px-4 py-3 text-sm text-ink-faint">All locations together are the summary above.</div>
+                </div>
+              </section>
+            )}
             <p className="text-xs text-ink-faint">
               Prepared with reference to the measurement framework of ISO 59020:2024.
             </p>
-            <PrimaryButton onClick={pdf}>Download branded PDF</PrimaryButton>
+            <ExportBar onPdf={pdf} onXlsx={xlsx} busy={busy} />
           </>
         )}
       </div>
@@ -169,7 +198,7 @@ const GLOSSARY: [string, string, string][] = [
 
 export function GlossaryPage() {
   return (
-    <Shell title="Glossary" back="/dashboard">
+    <Shell title="Words we use" back="/menu" purpose="Clariq's everyday words, mapped to the ISO 59004 vocabulary the reports use." help="reports">
       <p className="text-sm text-ink-soft mb-4">
         Clariq's day-to-day words, mapped to the vocabulary of ISO 59004:2024.
         Staff screens use the operational words; reports use the ISO terms.
@@ -187,12 +216,12 @@ export function GlossaryPage() {
   )
 }
 
-function Shell({ title, back, children }:
-  { title: string; back: string; children: React.ReactNode }) {
+function Shell({ title, back, purpose, help, children }:
+  { title: string; back: string; purpose?: string; help?: string; children: React.ReactNode }) {
   return (
     <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto">
       <BrandBar back={back} />
-      <h1 className="font-display text-xl font-semibold mt-5 mb-5">{title}</h1>
+      <PageHead title={title} purpose={purpose} help={help} />
       {children}
       <AppFooter />
     </main>

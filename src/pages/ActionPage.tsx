@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { ContainerCard, EventType, FillRecord, Option } from '../lib/gateway'
-import type { ContainerStatus } from '../lib/status'
+import { statusLabel, type ContainerStatus } from '../lib/status'
 import { Field, inputCls, PrimaryButton, Toggle } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
 
@@ -13,7 +13,7 @@ import { BrandBar, AppFooter } from '../components/Brand'
 
 const TITLES: Partial<Record<EventType, string>> = {
   INITIAL_INSPECTION: 'Initial inspection', FILLED: 'Fill container',
-  DISPATCHED: 'Dispatch', RETURN_REQUESTED: 'Request return', COLLECTED: 'Collect',
+  DISPATCHED: 'Dispatch', DELIVERED: 'Log a delivery', RETURN_REQUESTED: 'Request return', COLLECTED: 'Log a collection',
   RETURNED: 'Return container', WASHED: 'Wash', INSPECTED: 'Inspect',
   QUARANTINED: 'Quarantine', RELEASED: 'Release from quarantine',
   MARKED_LOST: 'Mark lost', FOUND: 'Found', RETIRED: 'Retire container',
@@ -64,6 +64,7 @@ export default function ActionPage() {
   const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<ContainerStatus | null>(null)
 
   useEffect(() => {
     gateway.getContainer(code ?? '').then(setCard)
@@ -85,10 +86,37 @@ export default function ActionPage() {
    * second question for the operator (Architecture 9.4, decision log). */
   const toStatus: ContainerStatus | null = useMemo(() => {
     if (!card) return null
+
+  // Done: say what the container is now, then the two things a person does
+  // next (decision 2026-08-30). Nothing else on the screen.
+  if (done) return (
+    <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto flex flex-col">
+      <BrandBar />
+      <section className="mt-10 text-center">
+        <div className="mx-auto w-16 h-16 rounded-full bg-status-ready text-white grid place-items-center">
+          <svg viewBox="0 0 24 24" className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 13l4 4L19 7" /></svg>
+        </div>
+        <h1 className="font-display text-2xl font-bold mt-5">Done</h1>
+        <p className="text-lg text-ink-soft mt-2">
+          <span className="font-display font-semibold text-ink">{card.code}</span> is now <span className="font-semibold text-ink">{statusLabel(done).toLowerCase()}</span>.
+        </p>
+      </section>
+      <nav className="mt-10 space-y-2.5">
+        <Link to={ev === 'DELIVERED' || ev === 'COLLECTED' ? `/scan?action=${ev}` : '/scan'}
+          className="block min-h-[64px] rounded-2xl bg-accent text-accent-ink font-display text-xl font-bold grid place-items-center shadow-card">
+          Scan the next one
+        </Link>
+        <Link to={`/c/${card.code}`} className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Back to {card.code}</Link>
+        <Link to="/dashboard" className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Go to Today</Link>
+      </nav>
+      <AppFooter />
+    </main>
+  )
     switch (ev) {
       case 'INITIAL_INSPECTION': return f.grade ? (['D','E'].includes(f.grade) ? 'QUARANTINED' : 'IN_STOCK') : null
       case 'FILLED': return 'FILLED'
       case 'DISPATCHED': return 'WITH_CUSTOMER'
+      case 'DELIVERED': return 'WITH_CUSTOMER'
       case 'RETURN_REQUESTED': return 'RETURN_REQUESTED'
       case 'COLLECTED': return 'IN_TRANSIT'
       case 'RETURNED': {
@@ -117,6 +145,8 @@ export default function ActionPage() {
         return !!f.grade && (!['D','E'].includes(f.grade) || !!f.reason)
       case 'FILLED': return !!f.productId && !!f.batchId && !!f.quantity_l
       case 'DISPATCHED': return !!f.customerId && !!f.siteId && !!f.expected_return_date
+      case 'DELIVERED': return true
+      case 'COLLECTED': return true
       case 'RETURNED':
         return [f.cap_present, f.residue_present, f.contamination, f.visible_damage]
           .every(v => typeof v === 'boolean')
@@ -143,11 +173,37 @@ export default function ActionPage() {
       payload, notes: note,
     })
     setBusy(false)
-    if (res.ok) nav(`/c/${card.code}`)
+    if (res.ok) setDone(toStatus)
     else setError(res.error)
   }
 
   if (!card) return null
+
+  // Done: say what the container is now, then the two things a person does
+  // next (decision 2026-08-30). Nothing else on the screen.
+  if (done) return (
+    <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto flex flex-col">
+      <BrandBar />
+      <section className="mt-10 text-center">
+        <div className="mx-auto w-16 h-16 rounded-full bg-status-ready text-white grid place-items-center">
+          <svg viewBox="0 0 24 24" className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 13l4 4L19 7" /></svg>
+        </div>
+        <h1 className="font-display text-2xl font-bold mt-5">Done</h1>
+        <p className="text-lg text-ink-soft mt-2">
+          <span className="font-display font-semibold text-ink">{card.code}</span> is now <span className="font-semibold text-ink">{statusLabel(done).toLowerCase()}</span>.
+        </p>
+      </section>
+      <nav className="mt-10 space-y-2.5">
+        <Link to={ev === 'DELIVERED' || ev === 'COLLECTED' ? `/scan?action=${ev}` : '/scan'}
+          className="block min-h-[64px] rounded-2xl bg-accent text-accent-ink font-display text-xl font-bold grid place-items-center shadow-card">
+          Scan the next one
+        </Link>
+        <Link to={`/c/${card.code}`} className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Back to {card.code}</Link>
+        <Link to="/dashboard" className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Go to Today</Link>
+      </nav>
+      <AppFooter />
+    </main>
+  )
 
   const Select = ({ k, options, placeholder }: { k: string; options: Option[]; placeholder: string }) => (
     <select className={inputCls} value={f[k] ?? ''} onChange={e => set(k, e.target.value)}>
@@ -197,6 +253,12 @@ export default function ActionPage() {
                 onChange={e => set('quantity_l', e.target.value)} placeholder={String(card.capacityLitres)} />
             </Field>
           </>
+        )}
+
+        {ev === 'DELIVERED' && (
+          <Field label="Received by (optional)">
+            <input className={inputCls} value={f.received_by ?? ''} onChange={e => set('received_by', e.target.value)} placeholder="Name at the site" />
+          </Field>
         )}
 
         {ev === 'DISPATCHED' && (

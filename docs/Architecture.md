@@ -539,3 +539,69 @@ Each stage ends with an update to this document.
 | 2026-08-30 | Scan screen diagnoses camera failure (no https, permission denied, no camera, camera busy) and offers retry | A generic "not available" hid the cause during testing; plain http on a LAN address is the usual one |
 | 2026-08-30 | Every report: sections from one query result, exported as PDF and XLSX (sheet per section plus raw Events); by-location section when a customer has more than one site; customers can open their own Circularity figures | Customer request; XLSX and by-location land with the reporting batch |
 | 2026-08-30 | Hazard classes at product level, seeded with GHS Rev 7 classes and categories; identifiers CAS, AACN (AU), HSNO approval or group standard (NZ), UN number and DG class, GTIN, supplier code; capture by barcode scan, then pick-list, then manual; OCR deferred | AU and NZ both use GHS Rev 7; AICIS is keyed on CAS; the customer is a workplace holder, not an AICIS introducer, and report wording says so |
+| 2026-08-30 | Export bar on every report (Customer report, Circularity, Chemical inventory): Download PDF and Download XLSX, identical for staff and customer views; customer report period bounding applied (this month, quarter, year, last 12 months, all time) | Customer request; one query result feeds screen, PDF and XLSX so they cannot disagree |
+| 2026-08-30 | Customer report always covers all locations; a by-location section appears when the customer has more than one site, with returns attributed to the site of the container's last dispatch | Multi-site organisations are the primary entry market |
+| 2026-08-30 | App-wide date format dd-mm-yyyy (`lib/dates.ts`); XLSX dates are real date cells with that display format; file names use it too (folders sort by Date Created) | Owner request; one helper so no screen drifts |
+| 2026-08-30 | Container card in customer view: "With you" chip, no staff actions, no Customer row; a customer opening a container that is not theirs lands on the public page | The card was still showing staff labels through the customer lens |
+| 2026-08-30 | Ease-of-use pass (section 21): role-based home with one verb and three doors, plain-language labels, purpose line and help mark on every screen, done screen with next steps, teaching empty states, first-run cards, "how do I" in Ask Clariq, `ui_events` usage signals | Objective: usable by a first-time user without instruction |
+
+---
+
+## 21. Ease of use (added 30 August 2026)
+
+Objective set by Clariq: a first-time or infrequent user should never have to ask "where do I go" or "what do I do". The app had grown around what the system can do; this section reorganises it around what a person came to do. Labels below are Clariq's words, signed off 30 August 2026, and may be tweaked later.
+
+### 21.1 Home screen by role
+
+One big verb, then at most three doors. Everything else is in Menu. Today's status tiles remain beneath.
+
+| Role | Big button | Doors |
+|---|---|---|
+| Warehouse Operator | Scan a container | Check a container · What is overdue for return · Print new labels |
+| Inspector | Scan a container | Check a container · What is overdue for return · Do an audit walk |
+| Driver | Scan a container | Log a delivery · Log a collection · What is overdue for return |
+| Admin | Scan a container | What is overdue for return · Do an audit walk · Reports |
+| Sales / Account | Reports | What is overdue for return · Customers · Chemicals on site |
+| Customer | See my containers | What is due back · My report · Chemicals on my site |
+
+"Check a container" opens the returns queue: every container awaiting wash or inspection, oldest first. "Log a delivery" and "Log a collection" scan first, then open that action's form (`/scan?action=DELIVERED|COLLECTED`). `DELIVERED` (`WITH_CUSTOMER` to `WITH_CUSTOMER`, section 9.2) is now in the front end with an optional "received by" field.
+
+### 21.2 Labels
+
+| Was | Now |
+|---|---|
+| Today | Today: what needs doing (customer: Home) |
+| Circularity (screen) | Reuse results. The ISO vocabulary stays on the reports themselves |
+| Customer report | Report for a customer (customer: My report) |
+| Chemical inventory | Chemicals on site (customer: Chemicals on my site) |
+| Audit | Do an audit walk |
+| New containers and labels | Print new labels |
+| Customers, sites and locations | Customers and their sites |
+| View as a customer | See what a customer sees |
+| How to use Clariq | Show me how |
+| Glossary | Words we use |
+| Overdue | What is overdue for return (customer: What is due back) |
+
+### 21.3 Every screen says what it is for
+
+`PageHead` on every screen: title, one-line purpose, and a "?" that opens the matching section of the guide (`/guide#section`). The guide lives in `src/lib/guide.ts` with stable ids, and also feeds Ask Clariq.
+
+### 21.4 Next step after an action
+
+After any event is recorded, the screen says what the container is now and offers only: Scan the next one, Back to the container, Go to Today. Delivery and collection doors loop straight back to the scanner with the same action.
+
+### 21.5 Empty states teach
+
+No blank lists. Each says what would fill it and offers the one action that would.
+
+### 21.6 First-run cards
+
+Three cards, once per role per device (`localStorage`), replayable from Menu ("Show me around"). The customer version says: scan any Clariq container to see what is in it.
+
+### 21.7 Ask Clariq answers "how do I"
+
+Questions phrased "how do I", "where do I", "what do I", "show me" are matched against the guide by keyword and answered instantly with the steps, a "Take me there" link to the screen and a "Show me how" link to the guide section. Everything else goes to the legislation corpus as before. Ingesting the guide into the pgvector corpus is a later improvement; the keyword match needs no database.
+
+### 21.8 Measure the confusion
+
+`ui_events` (migration 0021) records help opens, guide matches, door taps, first-run completion and bounces (a screen left within four seconds without an action). Insert-only for signed-in users in their tenant; Admin reads. Review after two weeks of real use to choose the next screens to fix.

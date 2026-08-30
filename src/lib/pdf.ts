@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import QRCode from 'qrcode'
+import type { CustomerReport, Dashboard } from './gateway'
+import { fmtDate } from './dates'
 import spec from '../../labels/label-spec.json'
 import logoUrl from '../../assets/clariq-logo.png'
 
@@ -81,19 +83,7 @@ export async function buildLabelSheetPdf(ids: string[], opts: { sample?: boolean
   return doc.save()
 }
 
-export interface ReportData {
-  customerName: string
-  periodLabel: string
-  containersAssigned: number
-  suppliedTotal: number
-  returnedTotal: number
-  returnRatePct: number
-  completedRotations: number
-  avgRotations: number
-  packagingAvoidedG: number
-  massRecoveredG: number
-  demo?: boolean
-}
+export type ReportData = CustomerReport & { demo?: boolean }
 
 export async function buildCustomerReportPdf(r: ReportData) {
   const doc = await PDFDocument.create()
@@ -114,7 +104,7 @@ export async function buildCustomerReportPdf(r: ReportData) {
 
   text('CIRCULARITY SUMMARY', 8.5, reg, FAINT); y -= 2 * MM
   text(r.customerName, 22, bold); y -= 1 * MM
-  text('Period: ' + r.periodLabel, 10, reg, SOFT); y -= 6 * MM
+  text('Period: ' + r.periodLabel + (r.periodStart ? ` (from ${fmtDate(r.periodStart)})` : '') + '   Prepared ' + fmtDate(new Date()), 10, reg, SOFT); y -= 6 * MM
 
   const rows: [string, string, boolean?][] = [
     ['Containers currently assigned', String(r.containersAssigned)],
@@ -136,6 +126,25 @@ export async function buildCustomerReportPdf(r: ReportData) {
     if (estimated) page.drawText('Estimated', { x: 194 * MM - 20 * MM, y: y + 0.6, size: 8, font: reg, color: FAINT })
     void v
     y -= 9.5 * MM
+  }
+
+  // By location: shown when the customer has more than one site, so a
+  // multi-site organisation can see where its containers are and how each
+  // location is performing. All locations together is the summary above.
+  if (r.sites.length > 1) {
+    y -= 3 * MM
+    text('BY LOCATION', 8.5, reg, FAINT); y -= 1 * MM
+    const cols = [16, 92, 122, 148, 172] .map(mm => mm * MM)
+    const heads = ['Location', 'Assigned', 'Supplied', 'Returned', 'Return rate']
+    heads.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: SOFT }))
+    y -= 5.5 * MM
+    for (const st of r.sites) {
+      page.drawLine({ start: { x: 16 * MM, y: y + 3.6 * MM }, end: { x: 194 * MM, y: y + 3.6 * MM },
+        thickness: 0.3, color: rgb(0.87, 0.86, 0.84) })
+      const vals = [st.siteName, String(st.containersAssigned), String(st.suppliedTotal), String(st.returnedTotal), st.returnRatePct + '%']
+      vals.forEach((v, i) => page.drawText(v.slice(0, i === 0 ? 44 : 12), { x: cols[i], y, size: 9.5, font: i === 0 ? reg : bold, color: INK }))
+      y -= 6.5 * MM
+    }
   }
 
   y -= 4 * MM
@@ -252,8 +261,63 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
   return doc.save()
 }
 
+/** Circularity screen as a one-page A4 PDF: the four ISO 59020 groups plus
+ * packaging avoided, for the fleet or for one customer's lens. */
+export async function buildCircularityPdf(d: Dashboard, scopeLabel: string, demo = false) {
+  const doc = await PDFDocument.create()
+  const page = doc.addPage([210 * MM, 297 * MM])
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const reg = await doc.embedFont(StandardFonts.Helvetica)
+  const logoBytes = await fetch(logoUrl).then(res => res.arrayBuffer())
+  const logo = await doc.embedPng(logoBytes)
+  const lw = 42 * MM
+  page.drawImage(logo, { x: 16 * MM, y: 297 * MM - 16 * MM - lw * (logo.height / logo.width), width: lw, height: lw * (logo.height / logo.width) })
+  let y = 297 * MM - 40 * MM
+  const text = (t: string, size: number, font = reg, color = INK) => { page.drawText(t, { x: 16 * MM, y, size, font, color }); y -= size * 1.55 }
+  const kg = (g: number) => (g / 1000).toFixed(1) + ' kg'
+  const c = d.circularity
+  text('CIRCULARITY', 8.5, reg, FAINT); y -= 2 * MM
+  text(scopeLabel, 22, bold); y -= 1 * MM
+  text('Period: all time   Prepared ' + fmtDate(new Date()), 10, reg, SOFT); y -= 5 * MM
+  const groups: [string, [string, string, boolean?][]][] = [
+    ['Resource inflows', [['Containers commissioned', String(c.inflows.commissioned)],
+      ['Average recycled content', c.inflows.avgRecycledContentPct != null ? c.inflows.avgRecycledContentPct + '%' : 'not yet recorded']]],
+    ['Value retention', [['Fills', String(c.retention.fills)], ['Completed cycles', String(c.retention.completedCycles)],
+      ['Return rate', c.retention.returnRatePct + '%'], ['Average rotations', String(c.retention.avgRotations)]]],
+    ['Resource outflows', [['Mass retired', kg(c.outflows.massRetiredG)], ['Mass recovered', kg(c.outflows.massRecoveredG)],
+      ['Recovery rate', c.outflows.recoveryRatePct != null ? c.outflows.recoveryRatePct + '%' : 'not yet recorded']]],
+    ['Losses', [['Containers lost', String(c.losses.count)], ['Mass lost', kg(c.losses.massG)]]],
+    ['Packaging avoided', [['Packaging avoided', kg(c.packagingAvoidedG), true]]],
+  ]
+  for (const [title, rows] of groups) {
+    text(title.toUpperCase(), 8.5, bold, SOFT); y -= 1 * MM
+    for (const [label, value, estimated] of rows) {
+      page.drawLine({ start: { x: 16 * MM, y: y + 3.8 * MM }, end: { x: 194 * MM, y: y + 3.8 * MM }, thickness: 0.3, color: rgb(0.87, 0.86, 0.84) })
+      page.drawText(label, { x: 16 * MM, y, size: 10, font: reg, color: SOFT })
+      const w = bold.widthOfTextAtSize(value, 11)
+      page.drawText(value, { x: 194 * MM - w - (estimated ? 22 * MM : 0), y, size: 11, font: bold, color: INK })
+      if (estimated) page.drawText('Estimated', { x: 194 * MM - 20 * MM, y: y + 0.6, size: 8, font: reg, color: FAINT })
+      y -= 7.5 * MM
+    }
+    y -= 2 * MM
+  }
+  y -= 2 * MM
+  text('Methodology', 9, bold, SOFT); y -= 1 * MM
+  for (const line of [
+    'Measured figures are computed from the container event history. Estimated figures use the',
+    'methodology configured by Clariq and are labelled Estimated. Prepared with reference to the',
+    'measurement framework of ISO 59020:2024. Clariq does not claim certification or conformity to',
+    'any ISO 59000 standard.',
+  ]) text(line, 8.5, reg, FAINT)
+  if (demo) { y -= 2 * MM; text('DEMONSTRATION DATA - generated fleet', 9, bold, rgb(0.85, 0.4, 0.35)) }
+  page.drawText('RETURN \u2022 REUSE \u2022 RECOVER   |   clariq.nz', { x: 16 * MM, y: 14 * MM, size: 8, font: reg, color: FAINT })
+  return doc.save()
+}
+
 export function download(bytes: Uint8Array, filename: string) {
-  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
+  const type = filename.endsWith('.xlsx')
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf'
+  const blob = new Blob([bytes as BlobPart], { type })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url; a.download = filename; a.click()

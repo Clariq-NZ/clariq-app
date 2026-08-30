@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { friendlyError } from './errors'
 import { supabase } from './supabase'
 import type { ContainerStatus } from './status'
-import type { ActionDef, ContainerCard, CustomerReport, Dashboard, EventType, FillRecord, Gateway, Option, SubmitEvent } from './gateway'
+import { periodStart, type ActionDef, type ContainerCard, type CustomerReport, type Dashboard, type EventType, type FillRecord, type Gateway, type Option, type SiteReportRow, type SubmitEvent } from './gateway'
 import { demoGateway } from './demoGateway'
 
 /** Live gateway. The action list is read from allowed_transitions - the same
@@ -10,7 +10,7 @@ import { demoGateway } from './demoGateway'
  * action. Label text for events reuses the demo table's operational words. */
 
 const ACTION_LABELS: Record<string, string> = {
-  INITIAL_INSPECTION: 'Initial inspection', FILLED: 'Fill', DISPATCHED: 'Dispatch',
+  INITIAL_INSPECTION: 'Initial inspection', FILLED: 'Fill', DISPATCHED: 'Dispatch', DELIVERED: 'Log delivery',
   RETURN_REQUESTED: 'Request return', COLLECTED: 'Collect', RETURNED: 'Return',
   WASHED: 'Wash', INSPECTED: 'Inspect', QUARANTINED: 'Quarantine',
   RELEASED: 'Release from quarantine', MARKED_LOST: 'Mark lost', FOUND: 'Found',
@@ -202,23 +202,69 @@ function makeLive(sb: SupabaseClient): Gateway {
       return codes
     },
     async getCustomerReport(customerId, periodLabel): Promise<CustomerReport> {
-      // Stage 6 completes period bounding; this returns all-time figures.
+      // One query result, several views: the summary, the by-location rows and
+      // the raw Events sheet are all cut from the same event list, so the
+      // screen, the PDF and the XLSX cannot disagree (decision 2026-08-30).
+      const since = periodStart(periodLabel)
       const { data: cust } = await sb.from('customers').select('trading_name, legal_name').eq('id', customerId).single()
-      const { data: ev } = await sb.from('container_events')
-        .select('event_type').eq('customer_id', customerId)
-      const fills = ((ev ?? []) as any[]).filter(e => e.event_type === 'DISPATCHED').length
-      const returns = ((ev ?? []) as any[]).filter(e => e.event_type === 'RETURNED').length
-      const { data: mine } = await sb.from('containers').select('id').eq('current_customer_id', customerId)
+      let q = sb.from('container_events')
+        .select(`event_type, occurred_at, site_id, quantity, payload,
+                 containers ( code, container_types ( empty_weight_g ) ),
+                 sites ( name ), products ( name )`)
+        .eq('customer_id', customerId)
+        .in('event_type', ['DISPATCHED', 'RETURNED', 'RETURN_REQUESTED', 'COLLECTED'])
+        .order('occurred_at', { ascending: true })
+      if (since) q = q.gte('occurred_at', since.toISOString())
+      const { data: ev } = await q
+      const events = ((ev ?? []) as any[])
+      // RETURNED events do not always carry a site; attribute each return to the
+      // site of that container's most recent dispatch.
+      const lastSiteByContainer = new Map<string, string>()
+      const bySite = new Map<string, SiteReportRow>()
+      const site = (name: string) => {
+        let r = bySite.get(name)
+        if (!r) { r = { siteName: name, containersAssigned: 0, suppliedTotal: 0, returnedTotal: 0, returnRatePct: 0, completedRotations: 0 }; bySite.set(name, r) }
+        return r
+      }
+      let fills = 0, returns = 0
+      for (const e of events) {
+        const code = e.containers?.code ?? ''
+        if (e.event_type === 'DISPATCHED') {
+          const name = e.sites?.name ?? 'Unspecified location'
+          lastSiteByContainer.set(code, name)
+          site(name).suppliedTotal++; fills++
+        } else if (e.event_type === 'RETURNED') {
+          const name = e.sites?.name ?? lastSiteByContainer.get(code) ?? 'Unspecified location'
+          const r = site(name); r.returnedTotal++; r.completedRotations++; returns++
+        }
+      }
+      const { data: mine } = await sb.from('containers').select('id, sites:current_site_id ( name )').eq('current_customer_id', customerId)
+      for (const c of (mine ?? []) as any[]) if (c.sites?.name) site(c.sites.name).containersAssigned++
+      for (const r of bySite.values()) r.returnRatePct = r.suppliedTotal ? Math.round((r.returnedTotal / r.suppliedTotal) * 1000) / 10 : 0
+      // Packaging avoided (estimated, Architecture 10.4): (returns - 1) x empty weight, per container in period
+      const returnsByContainer = new Map<string, { n: number; w: number }>()
+      for (const e of events) if (e.event_type === 'RETURNED') {
+        const code = e.containers?.code ?? ''
+        const cur = returnsByContainer.get(code) ?? { n: 0, w: e.containers?.container_types?.empty_weight_g ?? 0 }
+        cur.n++; returnsByContainer.set(code, cur)
+      }
+      const avoided = [...returnsByContainer.values()].reduce((s, c) => s + Math.max(c.n - 1, 0) * c.w, 0)
       return {
         customerName: (cust as any)?.trading_name ?? (cust as any)?.legal_name ?? 'Customer',
-        periodLabel,
+        periodLabel, periodStart: since?.toISOString().slice(0, 10),
         containersAssigned: (mine ?? []).length,
         suppliedTotal: fills, returnedTotal: returns,
         returnRatePct: fills ? Math.round((returns / fills) * 1000) / 10 : 0,
         completedRotations: returns,
         avgRotations: (mine ?? []).length ? Math.round((returns / (mine ?? []).length) * 10) / 10 : 0,
-        packagingAvoidedG: 0,  // served by v_packaging_avoided per customer in Stage 6
-        massRecoveredG: 0,
+        packagingAvoidedG: avoided,
+        massRecoveredG: 0,  // recovery is fleet-level (recycling records are not per customer)
+        sites: [...bySite.values()].sort((a, b) => a.siteName.localeCompare(b.siteName)),
+        events: events.map(e => ({
+          occurredAt: e.occurred_at, containerCode: e.containers?.code ?? '', eventType: e.event_type,
+          siteName: e.sites?.name ?? undefined, productName: e.products?.name ?? undefined,
+          quantityL: e.quantity ?? (e.payload?.quantity_l != null ? Number(e.payload.quantity_l) : undefined),
+        })),
       }
     },
     async submitEvent(e: SubmitEvent) {

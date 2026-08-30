@@ -4,6 +4,8 @@ import { gateway } from '../lib/supabaseGateway'
 import type { ActionDef, ContainerCard, FillRecord } from '../lib/gateway'
 import { StatusChip } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
+import { fmtDate } from '../lib/dates'
+import { useCustomerLens } from '../lib/customerFilter'
 
 /** The scan result: one card, one list of actions (Architecture 14, "Tone").
  * Actions come from the same transition table the database enforces, so this
@@ -12,6 +14,10 @@ import { BrandBar, AppFooter } from '../components/Brand'
 export default function ContainerPage() {
   const { code } = useParams()
   const nav = useNavigate()
+  // Customer view: the chip reads "With you", staff actions are hidden, and a
+  // container that is not theirs (the database returns nothing) falls through
+  // to the public page (Architecture 7).
+  const { customerView, isCustomerUser } = useCustomerLens()
   const [card, setCard] = useState<ContainerCard | null | 'loading'>('loading')
   const [actions, setActions] = useState<ActionDef[]>([])
   const [fills, setFills] = useState<FillRecord[]>([])
@@ -33,6 +39,8 @@ export default function ContainerPage() {
   }, [code])
 
   if (card === 'loading') return <Shell><p className="text-ink-faint">Loading…</p></Shell>
+
+  if (!card && isCustomerUser) { nav(`/public/c/${code}`, { replace: true }); return null }
 
   if (!card) return (
     <Shell>
@@ -58,22 +66,22 @@ export default function ContainerPage() {
             {card.productName && <div className="text-base font-semibold text-ink leading-snug">{card.productName}</div>}
             <div className="text-sm text-ink-soft mt-0.5">{card.typeCode} · {card.capacityLitres} L</div>
           </div>
-          <StatusChip status={card.status} />
+          <StatusChip status={card.status} customerView={customerView} />
         </div>
 
         {overdue && (
           <div className="flex items-center gap-2 rounded-xl bg-status-overdue text-white px-4 py-3 text-sm font-medium">
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"
               strokeLinecap="round" aria-hidden><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-            Overdue - expected {card.expectedReturnAt}
+            Overdue - expected {fmtDate(card.expectedReturnAt)}
           </div>
         )}
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[15px]">
-          {card.customerName && <Item k="Customer" v={card.customerName} />}
+          {card.customerName && !customerView && <Item k="Customer" v={card.customerName} />}
           {card.siteName && <Item k="Site" v={card.siteName} />}
           {card.batchCode && <Item k="Batch" v={card.batchCode} />}
-          {card.expectedReturnAt && !overdue && <Item k="Expected return" v={card.expectedReturnAt} />}
+          {card.expectedReturnAt && !overdue && <Item k="Expected return" v={fmtDate(card.expectedReturnAt)} />}
           {card.conditionGrade && <Item k="Condition" v={`Grade ${card.conditionGrade}`} />}
           <Item k="Cycles completed" v={String(card.completedCycles)} />
           <Item k="Fills / returns" v={`${card.fillCount} / ${card.returnCount}`} />
@@ -106,8 +114,9 @@ export default function ContainerPage() {
         </section>
       )}
 
-      {/* The actions */}
-      <section className="mt-6 space-y-2.5">
+      {/* The actions: staff only. A customer can request a collection later
+          (Architecture 7, Phase 2); until then their card is read-only. */}
+      {!customerView && <section className="mt-6 space-y-2.5">
         {actions.map(a => (
           <button key={a.eventType}
             onClick={() => nav(`/c/${card.code}/action/${a.eventType}`)}
@@ -118,7 +127,7 @@ export default function ContainerPage() {
             <span className="text-ink-faint" aria-hidden>›</span>
           </button>
         ))}
-      </section>
+      </section>}
 
       <section className="mt-6">
         <button type="button"
@@ -146,14 +155,14 @@ function contextText(c: ContainerCard): string {
     `Container ${c.code}, type ${c.typeCode}, ${c.capacityLitres} L, status ${c.status}.`,
     c.productName ? `Product: ${c.productName}${c.batchCode ? `, batch ${c.batchCode}` : ''}.` : '',
     c.customerName ? `With customer ${c.customerName}${c.siteName ? ` at ${c.siteName}` : ''}.` : '',
-    c.expectedReturnAt ? `Expected return ${c.expectedReturnAt}.` : '',
+    c.expectedReturnAt ? `Expected return ${fmtDate(c.expectedReturnAt)}.` : '',
     `Cycles completed ${c.completedCycles}.`,
   ]
   return lines.filter(Boolean).join(' ')
 }
 
 const ordinal = (n: number) => `${n}${['th','st','nd','rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : Math.min(n % 10, 4) % 4] ?? 'th'}`
-const day = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
+const day = fmtDate
 
 function Item({ k, v }: { k: string; v: string }) {
   return (
@@ -165,9 +174,10 @@ function Item({ k, v }: { k: string; v: string }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const { customerView } = useCustomerLens()
   return (
     <main className="min-h-dvh px-5 pb-28 max-w-md mx-auto">
-      <BrandBar back="/scan" />
+      <BrandBar back={customerView ? '/dashboard' : '/scan'} />
       <div className="mt-5">{children}</div>
       <AppFooter />
     </main>

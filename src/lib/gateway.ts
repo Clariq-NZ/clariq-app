@@ -44,7 +44,7 @@ export interface FillRecord {
 }
 
 export type EventType =
-  | 'INITIAL_INSPECTION' | 'FILLED' | 'DISPATCHED' | 'RETURN_REQUESTED'
+  | 'INITIAL_INSPECTION' | 'FILLED' | 'DISPATCHED' | 'DELIVERED' | 'RETURN_REQUESTED'
   | 'COLLECTED' | 'RETURNED' | 'WASHED' | 'INSPECTED' | 'QUARANTINED'
   | 'RELEASED' | 'MARKED_LOST' | 'FOUND' | 'RETIRED'
   | 'SENT_FOR_RECYCLING' | 'RECYCLED' | 'VOIDED' | 'NOTE'
@@ -90,9 +90,33 @@ export interface Dashboard {
   }
 }
 
+/** One location's slice of a customer report. Same measures as the summary,
+ * so the by-location section reads as the summary broken down, not as a
+ * different report. */
+export interface SiteReportRow {
+  siteName: string
+  containersAssigned: number
+  suppliedTotal: number
+  returnedTotal: number
+  returnRatePct: number
+  completedRotations: number
+}
+
+/** A raw event row for the XLSX Events sheet: what the figures were computed
+ * from, so a customer's own analyst can reproduce them. */
+export interface ReportEventRow {
+  occurredAt: string
+  containerCode: string
+  eventType: string
+  siteName?: string
+  productName?: string
+  quantityL?: number
+}
+
 export interface CustomerReport {
   customerName: string
   periodLabel: string
+  periodStart?: string        // ISO date; undefined = all time
   containersAssigned: number
   suppliedTotal: number
   returnedTotal: number
@@ -101,6 +125,22 @@ export interface CustomerReport {
   avgRotations: number
   packagingAvoidedG: number   // ESTIMATED
   massRecoveredG: number
+  /** One row per site; the by-location section shows when there is more than one. */
+  sites: SiteReportRow[]
+  events: ReportEventRow[]
+}
+
+/** Period labels offered on every report; the same list everywhere. */
+export const REPORT_PERIODS = ['This month', 'This quarter', 'This year', 'Last 12 months', 'All time'] as const
+export function periodStart(label: string, now = new Date()): Date | undefined {
+  const y = now.getFullYear(), m = now.getMonth()
+  switch (label) {
+    case 'This month': return new Date(y, m, 1)
+    case 'This quarter': return new Date(y, m - (m % 3), 1)
+    case 'This year': return new Date(y, 0, 1)
+    case 'Last 12 months': return new Date(y - 1, m, now.getDate())
+    default: return undefined
+  }
 }
 
 export interface Gateway {

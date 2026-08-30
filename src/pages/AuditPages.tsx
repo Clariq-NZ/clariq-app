@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { friendlyError } from '../lib/errors'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
-import { Field, inputCls, PrimaryButton } from '../components/ui'
+import { Field, inputCls, PrimaryButton, PageHead } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import * as A from '../lib/audit'
 import { attachPhoto } from '../lib/media'
@@ -12,11 +12,11 @@ import { LEVELS, labelsFor } from '../lib/locationLabels'
  * it scanning every container, close it to see the reconciliation. */
 
 const sb = () => supabase!
-function Shell({ title, back, children }: { title: string; back: string; children: React.ReactNode }) {
+function Shell({ title, back, purpose, help, children }: { title: string; back: string; purpose?: string; help?: string; children: React.ReactNode }) {
   return (
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
       <BrandBar back={back} />
-      <h1 className="font-display text-xl font-semibold mt-5 mb-4">{title}</h1>
+      <PageHead title={title} purpose={purpose} help={help} />
       {children}
       <AppFooter />
     </main>
@@ -50,7 +50,7 @@ export function AuditHomePage() {
     catch (x: any) { setErr(friendlyError(x)) }
   }
   return (
-    <Shell title="Audit" back="/menu">
+    <Shell title="Do an audit walk" back="/dashboard" purpose="Walk a site and sight every container, one scan each." help="audit">
       {open.length > 0 && (
         <section className="mb-6">
           <h2 className="text-xs tracking-[0.18em] text-ink-faint mb-2">IN PROGRESS</h2>
@@ -241,7 +241,7 @@ export function AuditResultPage() {
   const cond = (k: string) => rows.filter(r => r.outcome === 'SIGHTED' && r.condition_grade === k).length
   const Tile = ({ n, label }: { n: number; label: string }) => <div className="rounded border border-line bg-surface px-4 py-3"><span className="block text-2xl font-semibold tabular-nums">{n}</span><span className="text-sm text-ink-soft">{label}</span></div>
   return (
-    <Shell title="Reconciliation" back="/audit">
+    <Shell title="What the walk found" back="/audit" purpose="Sighted, expected but not sighted, and turned up somewhere else." help="audit">
       <p className="text-sm text-ink-soft -mt-2 mb-4">{s.customers?.trading_name} &middot; {s.sites?.name} &middot; {s.code}{s.closed_at ? '' : ' (still open)'}</p>
       <div className="grid grid-cols-2 gap-2 mb-5">
         <Tile n={by('SIGHTED').length} label="Sighted" />

@@ -1,13 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Outlet, RouterProvider, useLocation } from 'react-router-dom'
+import { track } from './lib/track'
 import PublicScanPage from './pages/PublicScanPage'
 import ScanPage from './pages/ScanPage'
 import ContainerPage from './pages/ContainerPage'
 import ActionPage from './pages/ActionPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
-import { CircularityPage, OverduePage, StatusListPage } from './pages/CircularityPage'
+import { CircularityPage, OverduePage, QueuePage, StatusListPage } from './pages/CircularityPage'
 import { CreateContainersPage, GlossaryPage, ReportPage } from './pages/AdminPages'
 import MenuPage from './pages/MenuPage'
 import GuidePage from './pages/GuidePage'
@@ -29,12 +30,28 @@ const demo = new URLSearchParams(location.search).has('demo') || !hasBackend
 const staff = (el: React.ReactNode) => <RequireStaff>{el}</RequireStaff>
 const account = (el: React.ReactNode) => <RequireAccount>{el}</RequireAccount>
 
-const router = createBrowserRouter([
+/** Bounce tracking (Architecture 21.7): a screen left within four seconds of
+ * arriving, without an action, is a "where am I" moment worth counting. */
+function Root() {
+  const loc = useLocation()
+  React.useEffect(() => {
+    const path = loc.pathname
+    const at = Date.now()
+    return () => {
+      const dwell = Date.now() - at
+      if (dwell < 4000 && !/^\/(login|c\/CLQ-\d+\/action)/.test(path)) track('bounce', path, { dwell_ms: dwell })
+    }
+  }, [loc.pathname])
+  return <Outlet />
+}
+
+const router = createBrowserRouter([{ element: <Root />, children: [
   { path: '/', element: demo ? <DashboardPage /> : <LoginPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/dashboard', element: account(<DashboardPage />) },
   { path: '/dashboard/circularity', element: account(<CircularityPage />) },
   { path: '/dashboard/overdue', element: account(<OverduePage />) },
+  { path: '/dashboard/queue', element: staff(<QueuePage />) },
   { path: '/dashboard/status/:status', element: account(<StatusListPage />) },
   { path: '/admin/new-containers', element: staff(<CreateContainersPage />) },
   { path: '/report', element: account(<ReportPage />) },
@@ -58,7 +75,7 @@ const router = createBrowserRouter([
   { path: '/c/:code', element: <ScanLanding /> },
   { path: '/c/:code/action/:event', element: staff(<ActionPage />) },
   { path: '/public/c/:code', element: <PublicScanPage /> },
-])
+]}])
 
 /** Signed-in staff get the container card; everyone else the public page.
  * Decided at render time from the session, not the URL. */
@@ -70,7 +87,9 @@ import { useAuth } from './lib/auth'
 function SessionSwitch({ staff: s, other }: { staff: React.ReactNode; other: React.ReactNode }) {
   const { loading, user } = useAuth()
   if (loading) return null
-  return <>{user && user.role_code !== 'CUSTOMER' ? s : other}</>
+  // Staff and customer accounts both get the card; ContainerPage sends a
+  // customer to the public page when the container is not theirs.
+  return <>{user ? s : other}</>
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

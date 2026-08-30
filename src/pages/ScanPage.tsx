@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { inputCls, PrimaryButton } from '../components/ui'
+import { inputCls, PageHead, PrimaryButton } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
 import jsQR from 'jsqr'
 
@@ -32,7 +32,8 @@ export default function ScanPage() {
   const nav = useNavigate()
   const [sp] = useSearchParams()
   const next = sp.get('next')
-  const go = (code: string) => nav(next ? `${next}${code}` : `/c/${code}`)
+  const action = sp.get('action')   // a home-screen door: scan, then straight to that action
+  const go = (code: string) => nav(next ? `${next}${code}` : action ? `/c/${code}/action/${action}` : `/c/${code}`)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [camera, setCamera] = useState<CameraState>({ kind: 'starting' })
   const [attempt, setAttempt] = useState(0)
@@ -98,7 +99,7 @@ export default function ScanPage() {
     }
     run()
     return () => { stop = true; stream?.getTracks().forEach(t => t.stop()) }
-  }, [nav, next, attempt])
+  }, [nav, next, action, attempt])
 
   const submitManual = (e: React.FormEvent) => {
     e.preventDefault()
@@ -109,7 +110,8 @@ export default function ScanPage() {
   return (
     <main className="min-h-dvh flex flex-col px-5 pb-6">
       <BrandBar back="/dashboard" />
-      <div className="h-5" />
+      <PageHead title={action === 'DELIVERED' ? 'Log a delivery' : action === 'COLLECTED' ? 'Log a collection' : 'Scan a container'}
+        purpose={action ? 'Scan the container first; the form comes next.' : 'Point the camera at the QR label, or type the number.'} help="scan" />
 
       <section className="relative rounded-2xl overflow-hidden bg-ink aspect-square max-w-md w-full mx-auto">
         {/* The video element is always mounted so the ref exists before the

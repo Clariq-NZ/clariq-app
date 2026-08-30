@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { friendlyError } from '../lib/errors'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
-import { Field, inputCls, PrimaryButton } from '../components/ui'
+import { Field, inputCls, PrimaryButton, PageHead } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { tenantId, listLocations, addLocation, type Location } from '../lib/audit'
 import { PRESETS, LEVELS, labelsFor, type LocationLabels } from '../lib/locationLabels'
@@ -12,11 +12,11 @@ import { PRESETS, LEVELS, labelsFor, type LocationLabels } from '../lib/location
  * only; the rest is edited later. */
 
 const sb = () => supabase!
-function Shell({ title, back, children }: { title: string; back: string; children: React.ReactNode }) {
+function Shell({ title, back, purpose, help, children }: { title: string; back: string; purpose?: string; help?: string; children: React.ReactNode }) {
   return (
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
       <BrandBar back={back} />
-      <h1 className="font-display text-xl font-semibold mt-5 mb-5">{title}</h1>
+      <PageHead title={title} purpose={purpose} help={help} />
       {children}
       <AppFooter />
     </main>
@@ -31,7 +31,7 @@ export function CustomersPage() {
   const [rows, setRows] = useState<any[]>([])
   useEffect(() => { sb().from('customers').select('id, code, trading_name, legal_name, account_status').is('archived_at', null).order('trading_name').then(r => setRows(r.data ?? [])) }, [])
   return (
-    <Shell title="Customers" back="/menu">
+    <Shell title="Customers and their sites" back="/menu" purpose="Who Clariq supplies, and where. Open a customer to add sites and locations." help="customer-setup">
       <Link to="/admin/customers/new" className="block rounded bg-ink text-paper text-center py-3.5 font-semibold mb-4">Add a customer</Link>
       <ul className="space-y-2">
         {rows.map(c => (
@@ -173,7 +173,7 @@ export function ProductsPage() {
     if (!error) { setF({ name: '', product_group: '', manufacturer: '', concentration: '', sds_url: '' }); void load() }
   }
   return (
-    <Shell title="Products" back="/menu">
+    <Shell title="Products" back="/menu" purpose="The chemicals Clariq supplies or expects to find." help="customer-setup">
       <ul className="space-y-1.5 mb-5">
         {rows.map(p => <li key={p.id} className="rounded border border-line bg-surface px-4 py-2.5"><span className="font-medium">{p.name}</span><span className="block text-sm text-ink-soft">{p.code}{p.product_group ? ` · ${p.product_group}` : ''}{p.manufacturer ? ` · ${p.manufacturer}` : ''}</span></li>)}
       </ul>
@@ -200,7 +200,7 @@ export function SettingsPage() {
   }
   if (!settings) return null
   return (
-    <Shell title="Settings" back="/menu">
+    <Shell title="Settings" back="/menu" purpose="Region motif and the overdue thresholds." help="overdue">
       <Field label="Region motif (background)">
         <select className={inputCls} value={settings.region_motif ?? 'NONE'} onChange={e => save({ region_motif: e.target.value })}>
           <option value="NONE">None</option>
@@ -217,7 +217,7 @@ export function ViewAsPage() {
   const [rows, setRows] = useState<any[]>([])
   useEffect(() => { sb().from('customers').select('id, trading_name, legal_name').is('archived_at', null).order('trading_name').then(r => setRows(r.data ?? [])) }, [])
   return (
-    <Shell title="View as a customer" back="/menu">
+    <Shell title="See what a customer sees" back="/menu" purpose="Home and the reports with that customer locked on and staff actions hidden." help="view-as">
       <p className="text-sm text-ink-soft mb-4">Opens Today and the reports with that customer's lens locked on and staff actions hidden, which is what their own users see after sign-in.</p>
       <ul className="space-y-2">
         {rows.map(c => <li key={c.id}><Link to={`/dashboard?customer=${c.id}&view=customer`} className="block rounded border border-line bg-surface px-4 py-3 font-medium">{c.trading_name || c.legal_name}</Link></li>)}
