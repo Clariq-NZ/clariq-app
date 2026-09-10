@@ -1,11 +1,13 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 30 August 2026 in the decision log
+**Version:** 0.2 (approved for build); build notes through 9 September 2026 in the decision log
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
 
 **Changes in 0.2:** ISO 59000 series alignment (new section 10.6, dashboard restructure in section 13, report methodology rules, schema additions in 8.1 and 8.5, value-retention mapping in 9.2); logo received; decision log and open items updated.
+
+**Changes 9 and 10 September 2026:** production database purged of seeded demo data (migrations 0022 and 0023); demo rebuilt as a second Supabase project plus a second Netlify site, both from the one repository (new section 20); Netlify sites named `clariq-hub` (production, permanent, printed on labels) and `clariq-demo`; Supabase Free-plan pause recorded as a go-live blocker; auth email moved to custom SMTP (Gmail interim, Resend target).
 
 This document is the single source of truth for how the platform is built. It is updated at the end of every build session. Anything not in here does not exist.
 
@@ -34,9 +36,9 @@ Design principles, in priority order:
 | Database, auth, storage, edge functions | Supabase (Postgres) | Row-level security, built-in auth (magic link, passkey), object storage for media, SQL export. Clariq-owned project. |
 | Front end | React + TypeScript + Vite, PWA (installable, offline shell) | Static build, no server rendering needed. |
 | Styling | Tailwind CSS with a Clariq design-token layer | Tokens (colour, type, spacing) live in one file for rebranding. |
-| Hosting / CDN | Netlify | Static PWA; Netlify and Vercel are equivalent for this build. Known over unknown. |
-| Domain | `app.clariq.nz` | CNAME to Netlify. Marketing site untouched. |
-| Email | Resend (magic links, digests) | Clariq-owned account, sending domain `clariq.nz` verified. |
+| Hosting / CDN | Netlify (Pro), two projects from one repo: `clariq-hub` and `clariq-demo` (section 20) | Static PWA; Netlify and Vercel are equivalent for this build. Known over unknown. |
+| Domain | `clariq-hub.netlify.app` (production, permanent) and `clariq-demo.netlify.app` | Custom domains `app.clariq.nz` and `demo.clariq.nz` are optional later additions; Netlify serves both addresses side by side, so labels printed with the netlify.app address never break. Marketing site untouched. |
+| Email | Custom SMTP on Supabase Auth: Gmail (`clariqnz@gmail.com`, sender name Clariq) as interim; Resend with `clariq.nz` once DNS access exists | Built-in Supabase mailer is rate-capped and unbranded; never used for customers. |
 | QR generation | Client-side (`qrcode` library) + PDF label sheet | No external service dependency. |
 | QR scanning | Native phone camera (URL) and in-app scanner (`BarcodeDetector` with library fallback) | No app store, no hardware. |
 
@@ -424,7 +426,7 @@ The `notification_rules` table (`trigger`, `channel`, `recipient_role`, `active`
 
 **Screen 3 - Financial.** Fleet cost, replacement value, lost value, deposit balances, cost per use.
 
-**Demo mode (lockstep).** The app ships with a built-in demonstration mode: the same screens and the same gateway interface, backed by a deterministic generated fleet (~120 containers, six customers, realistic overdue spread) instead of Supabase. It activates automatically when no backend is configured and on demand via `?demo=1` after go-live, for sales demonstrations and staff training. Lockstep is structural, not procedural: there is one UI, so every change to the app is a change to the demo. Demo data fabricates *data* only; behaviour always comes from the mirrored transition table, and the database remains authoritative.
+**Demo (lockstep).** From 10 September 2026 the demo is the real app running against its own Supabase project (`clariq-demo`) and published at `clariq-demo.netlify.app` from the same repository (section 20). The in-memory demo gateway (`?demo=1`, or no Supabase variables present) remains for local development only; it is not the sales demo, because a third of the app (audit walk, master data, chemicals on site, Ask Clariq, photos) reads Supabase directly and has no in-memory twin. Lockstep is structural: one codebase, both sites rebuild on every commit, and every migration is applied to both projects.
 
 **Customer report.** Per customer, date range (month, quarter, year, custom). On-screen and Clariq-branded PDF. Fields as brief section 21, grouped using the ISO vocabulary. Ends with a methodology block: which figures are measured vs estimated, the methodology text, and the fixed sentence *"Prepared with reference to the measurement framework of ISO 59020:2024."* The claim wording rule in section 10.6 applies. Available to the customer's own users.
 
@@ -491,6 +493,8 @@ Each stage ends with an update to this document.
 | Batch ID format not yet confirmed | Stored as validated string; validation rule adjustable in settings |
 | Colour palette clash between functional and brand colours | Resolved at UI stage with contrast checks; functional colours can shift within the Okabe–Ito set |
 | Single Admin is a single point of access | Second Admin recommended before go-live; documented in `Handover.md` |
+| Supabase Free plan pauses a project after seven days without traffic; first visitor after that sees errors until an owner restores it (happened to production 9 Sep 2026) | Production: move to Pro before the first live customer (never pauses, daily backups, section 15). Demo: scheduled keep-awake ping (open item 11) |
+| Netlify site name is baked into every printed label | `clariq-hub` is permanent: never renamed, never deleted and recreated. Adding `app.clariq.nz` later does not retire the netlify.app address |
 
 ---
 
@@ -503,6 +507,13 @@ Each stage ends with an update to this document.
 5. Who at Clariq will be the second Admin.
 6. Clariq to purchase ISO 59004 and ISO 59020 before public marketing claims reference them (section 10.6).
 7. Recycled/renewable content percentages to be requested from the container manufacturer.
+8. Production Supabase project to move from Free to Pro before the first live customer (section 17).
+9. Drop the `demo_snapshot` schema on production; the demo seed has been reconciled against it (section 20.4).
+10. Custom domains `app.clariq.nz` and `demo.clariq.nz`: optional, when DNS access exists.
+11. Keep-awake ping for the `clariq-demo` Supabase project (section 20.5).
+12. Resend SMTP on both projects once `clariq.nz` DNS records can be added; Gmail SMTP is the interim (section 20.6).
+13. Demo banner in the app, driven by hostname (section 20.2).
+14. Branded magic link template on both projects.
 
 ---
 
@@ -544,6 +555,71 @@ Each stage ends with an update to this document.
 | 2026-08-30 | App-wide date format dd-mm-yyyy (`lib/dates.ts`); XLSX dates are real date cells with that display format; file names use it too (folders sort by Date Created) | Owner request; one helper so no screen drifts |
 | 2026-08-30 | Container card in customer view: "With you" chip, no staff actions, no Customer row; a customer opening a container that is not theirs lands on the public page | The card was still showing staff labels through the customer lens |
 | 2026-08-30 | Ease-of-use pass (section 21): role-based home with one verb and three doors, plain-language labels, purpose line and help mark on every screen, done screen with next steps, teaching empty states, first-run cards, "how do I" in Ask Clariq, `ui_events` usage signals | Objective: usable by a first-time user without instruction |
+| 2026-09-09 | Demo to be a second Netlify site from the same repository (NaloHub two-site model); the demo tenant idea is not pursued | Lockstep by construction; Clariq's tenancy stays reserved for real licensees |
+| 2026-09-10 | Demo backend is a second Supabase project (`clariq-demo`), not the in-memory gateway | Code review showed audit walk, master data, inventory, Ask Clariq and photos bypass the gateway; an in-memory demo would need every feature built twice and would lag production. The real app on a second project can never lag |
+| 2026-09-10 | Netlify projects named `clariq-hub` (production) and `clariq-demo`; `clariq-hub` treated as permanent from this date | Labels carry the full URL; the netlify.app address remains valid if a custom domain is added later |
+| 2026-09-10 | Demo-only migrations live in `supabase/demo/`, never in `supabase/migrations/` | `supabase db push` and the connector workflow must never carry seed or reset functions to production |
+| 2026-09-10 | Supabase Auth email via custom SMTP: Gmail interim, Resend target | Built-in mailer is capped at a few emails per hour and unbranded; DNS for `clariq.nz` not yet accessible |
+| 2026-09-10 | Netlify team upgraded to Pro | Free credits exhausted; production deploys were paused |
+| 2026-09-09 | Seeded demo and test data purged from production (migration 0023) after a full copy to schema `demo_snapshot` (migration 0022); all sequences restarted so the first real container is CLQ-000001 | Clean start for the first customer; the copy lets the demo seed be reconciled from real records rather than memory |
+| 2026-09-09 | Migration 0023 is the single sanctioned exception to append-only: the two `reject_mutation` delete triggers were disabled for that migration only and re-enabled inside it | Pre-customer data with no operational value; the exception is named in the migration header and here so it can never be cited as precedent |
+| 2026-09-09 | All five container types kept through the purge, including `TYPE-AUDIT-UNKNOWN` | Needed by the audit walk; manufacturer and model fields to be corrected in-app when real stock is confirmed |
+
+---
+
+## 20. Environments: production and demo (added 9 September 2026, revised 10 September)
+
+One repository, two Supabase projects, two Netlify projects. Everything that is code is shared; everything that is data is separate.
+
+### 20.1 The two environments
+
+| | Production (the hub) | Demo |
+|---|---|---|
+| Address | `https://clariq-hub.netlify.app` (permanent, on labels) | `https://clariq-demo.netlify.app` |
+| Netlify project | `clariq-hub`, team clariqnz (Pro) | `clariq-demo`, same team |
+| Supabase project | `oksxzvomjjsjhjqifqhk`, "Circular Container Tracker", Sydney | `yuwpakqhcwjheibfaeof`, "clariq-demo", Sydney |
+| Netlify env vars | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` for production | same two names, demo project's values |
+| Data | real customers only; sequences start at 1 | deterministic seeded fleet (144 containers, 6 customers), reset on demand |
+| Users | invited real staff and customers; Admins: Greg, Jay (`jnf1306@gmail.com` and `info@clariq.nz`), Clariq Admin | same Admins; plus `clariqnz+staff@gmail.com` (Warehouse) and `clariqnz+customer@gmail.com` (Customer, on CUS-0001) |
+| Ask Clariq | own corpus and secrets | identical corpus copied from production; own secrets |
+| Labels | printed here only | never printed |
+
+Both projects run the same migrations, the same edge functions (`ask`, `embed_chunks`) and the same app build. The demo is the real product; nothing in it is simulated.
+
+### 20.2 Rules
+
+In step:
+1. Every migration is applied to both projects, production first, one `apply_migration` call each, then committed to `supabase/migrations/`. A migration is not finished until it is on both.
+2. Every edge function change is deployed to both.
+3. Code needs nothing extra: one commit to `main` rebuilds both Netlify projects.
+4. Nothing is created by hand on either project. Anything that was (the tenant row, `load_corpus_file`) has since been captured as a migration.
+
+Apart:
+5. Demo data never enters production. Migration 0023 purged what was there; the seed runs only on the demo project.
+6. Production-only migrations (0022 snapshot, 0023 purge) are not applied to demo. Demo-only migrations (tenant row, `dblink`, `seed_demo`, `reset_demo`, invites) live in `supabase/demo/`, not in `supabase/migrations/`, so no tooling can carry them to production.
+7. Real labels are printed from production only, carrying `https://clariq-hub.netlify.app/c/CLQ-000000`. The `clariq-hub` project name is never changed and never deleted.
+8. The demo shows a visible "Demo environment" banner, driven by hostname so it cannot ship to production (open item 13).
+
+Both:
+9. `container_events` and `audit_log` are append-only; `containers` is trigger-written only; the ISO wording rule; RLS on every table.
+
+### 20.3 Why a second project rather than an in-memory demo
+
+The gateway interface covers the core built on 24 August (container card, actions, dashboard, status lists, customer report, labels). Everything built since reads Supabase directly: audit walk (`lib/audit.ts`), master data (`AdminMasterData.tsx`), chemicals on site (`InventoryReportPage.tsx` on `v_site_inventory`), Ask Clariq, photo upload and `ui_events`. An in-memory demo would need every one of those rebuilt in TypeScript and kept in step with SQL views and RPCs indefinitely. A second project costs one extra `apply_migration` call per migration and nothing else.
+
+### 20.4 The purge, the snapshot and the seed
+
+Until 9 September the demo fleet plus later test records lived in production. Migration 0022 copied every affected table to schema `demo_snapshot` on production (no app access); migration 0023 deleted them from `public`, restarted every sequence and asserted the result. The seed function on the demo project (`supabase/demo/0024_demo_seed_and_reset.sql`) reproduces that fleet deterministically (`setseed(0.42)`) through `create_container()` and the event trigger, with the Clarq test customer, Meremere and the 24 NEW containers appended; it was verified against `demo_snapshot` (144 containers, 246 deposits, 18 recycling records). `demo_snapshot` can now be dropped (open item 9).
+
+Migration 0023 is the single sanctioned exception to append-only, recorded in the decision log.
+
+### 20.5 Reset and keep-awake
+
+`reset_demo()` (owner-only, run through the connector or SQL editor) purges every business row, restarts the sequences, re-runs `seed_demo()` and reattaches customer-linked users to CUS-0001. Run it after any sales walk that changed data. A scheduled keep-awake ping (open item 11) stops the Free-plan demo project from pausing.
+
+### 20.6 Auth email
+
+Supabase Auth sends magic links through custom SMTP on both projects. Interim: Gmail (`smtp.gmail.com:465`, `clariqnz@gmail.com`, app password, sender name Clariq). Target: Resend with `noreply@clariq.nz`, which needs three DNS records on `clariq.nz`. The switch is the same five SMTP fields; nothing else changes.
 
 ---
 
