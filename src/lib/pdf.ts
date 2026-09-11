@@ -64,7 +64,7 @@ export async function buildLabelSheetPdf(ids: string[], opts: { sample?: boolean
     spaced('CONTAINER ID', reg, 5.8, y0 + 31 * MM, 1.3)
     spaced(id, bold, 16.5, y0 + 24 * MM, 0.9)
 
-    const pl = 'Property of Clariq - please return'
+    const pl = 'Return this container to Clariq'
     const plW = reg.widthOfTextAtSize(pl, 7.5)
     page.drawText(pl, { x: x0 + LABEL.w / 2 - plW / 2, y: y0 + pad * 0.8, size: 7.5, font: reg, color: INK })
 

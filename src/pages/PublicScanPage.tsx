@@ -43,7 +43,7 @@ export default function PublicScanPage() {
 
       <section className="max-w-sm text-center space-y-4">
         <h1 className="font-display text-lg font-semibold">
-          This container belongs to Clariq
+          Return this container to Clariq
         </h1>
         <p className="text-ink-soft leading-relaxed">
           Please return it so it can be washed, inspected and used again.
