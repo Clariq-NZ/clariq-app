@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { Navigate, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { inMemoryDemo as demo } from './env'
 import { applyMotif, Lockup } from '../components/Brand'
 
 /**
@@ -28,7 +29,6 @@ type AuthState = {
   signOut: () => Promise<void>
 }
 
-const demo = new URLSearchParams(location.search).has('demo')
 
 const AuthContext = createContext<AuthState>({
   loading: false, session: null, user: null, signOut: async () => {},

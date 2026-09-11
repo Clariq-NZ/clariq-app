@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import type { ContainerStatus } from './status'
 import { periodStart, type ActionDef, type ContainerCard, type CustomerReport, type Dashboard, type EventType, type FillRecord, type Gateway, type Option, type SiteReportRow, type SubmitEvent } from './gateway'
 import { demoGateway } from './demoGateway'
+import { inMemoryDemo } from './env'
 
 /** Live gateway. The action list is read from allowed_transitions - the same
  * table the database trigger enforces - so the UI can never offer an illegal
@@ -16,6 +17,23 @@ const ACTION_LABELS: Record<string, string> = {
   RELEASED: 'Release from quarantine', MARKED_LOST: 'Mark lost', FOUND: 'Found',
   RETIRED: 'Retire', SENT_FOR_RECYCLING: 'Send for recycling',
   RECYCLED: 'Record recycled', VOIDED: 'Void ID', NOTE: 'Add note',
+}
+
+/** The signed-in person's role flags, keyed exactly as allowed_transitions.requires
+ * names them (fill_dispatch, wash, inspect, ...), plus can_authorise. Cached for
+ * the session; a role change takes effect at next sign-in. */
+let permsCache: Record<string, boolean> | null = null
+async function loadPermissions(sb: SupabaseClient): Promise<Record<string, boolean>> {
+  if (permsCache) return permsCache
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return {}
+  const { data } = await sb.from('app_users').select('can_authorise, roles(*)').eq('id', user.id).maybeSingle()
+  const role = (Array.isArray((data as any)?.roles) ? (data as any).roles[0] : (data as any)?.roles) ?? {}
+  const out: Record<string, boolean> = {}
+  for (const [k, v] of Object.entries(role)) if (typeof v === 'boolean') out[k] = v
+  out.can_authorise = !!(data as any)?.can_authorise || role.code === 'ADMIN'
+  permsCache = out
+  return out
 }
 
 function makeLive(sb: SupabaseClient): Gateway {
@@ -148,17 +166,22 @@ function makeLive(sb: SupabaseClient): Gateway {
       }
     },
     async getActions(status) {
-      const { data, error } = await sb
-        .from('allowed_transitions')
-        .select('event_type, to_status, requires')
-        .eq('from_status', status)
+      const [{ data, error }, perms] = await Promise.all([
+        sb.from('allowed_transitions').select('event_type, to_status, requires').eq('from_status', status),
+        loadPermissions(sb),
+      ])
       if (error || !data) return []
       const map = new Map<string, ActionDef>()
       for (const row of data as any[]) {
+        // Architecture 9.2: staff only ever see actions they are allowed to
+        // take. can_authorise is the one exception: the action is shown with a
+        // flag so the person knows an authorised colleague must record it.
+        const req = row.requires as string | null
+        if (req && req !== 'can_authorise' && !perms[req]) continue
         const a = map.get(row.event_type) ??
           { eventType: row.event_type as EventType, label: ACTION_LABELS[row.event_type] ?? row.event_type, toStatuses: [], needsAuthorise: false }
         a.toStatuses.push(row.to_status)
-        a.needsAuthorise = a.needsAuthorise || row.requires === 'can_authorise'
+        a.needsAuthorise = a.needsAuthorise || (req === 'can_authorise' && !perms.can_authorise)
         map.set(row.event_type, a)
       }
       const list = [...map.values()]
@@ -291,11 +314,11 @@ function makeLive(sb: SupabaseClient): Gateway {
   }
 }
 
-/** Resolution: live when env vars exist, demo otherwise. Demo can be forced
- * with ?demo=1 for training and walkthroughs even after go-live. */
+/** Resolution (Architecture section 20): live whenever a backend is configured.
+ * The in-memory gateway is a developer convenience for checkouts without a
+ * .env (and ?demo=1 in local development); it is never the sales demo. */
 export function makeGateway(): Gateway {
-  const forceDemo = new URLSearchParams(location.search).has('demo')
-  if (!supabase || forceDemo) return demoGateway
+  if (!supabase || inMemoryDemo) return demoGateway
   return makeLive(supabase)
 }
 

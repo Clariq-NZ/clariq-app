@@ -39,8 +39,13 @@ One repository, two Supabase projects, two Netlify projects (Architecture sectio
 - A local checkout with no `.env` runs the in-memory gateway; `?demo=1` forces
   it. That is a developer convenience, not the sales demo.
 - Supabase Free plan pauses a project after seven days idle. Restore from the
-  dashboard (takes two to five minutes). Production must move to Pro before the
-  first live customer.
+  dashboard (takes two to five minutes). A Netlify scheduled function pings
+  each project daily so this should not recur, but the restore is the remedy.
+- Free-plan nano compute has a small Disk IO budget. Heavy one-off work
+  (bulk copies, purges, corpus loads) can exhaust it and make the project
+  unresponsive for hours; the fix is Project Settings, General, Restart
+  project, then wait. Production must move to Pro (micro compute) before any
+  further such work and before the first live customer.
 - Auth email: custom SMTP on both projects. Currently Gmail
   (`smtp.gmail.com`, port 465, user `clariqnz@gmail.com`, Google app password,
   sender name Clariq). Switch to Resend (`smtp.resend.com`, user `resend`,
@@ -76,6 +81,8 @@ One repository, two Supabase projects, two Netlify projects (Architecture sectio
   record is migration 0023 (9 Sep 2026), which purged pre-customer demo data
   after copying it to schema `demo_snapshot`; it is not a precedent.
 - The `containers` table is written only by database triggers.
+- Container IDs ascend and are never reused; gaps can appear after a failed
+  create and are not a fault.
 - Container IDs are sequential and never reused. Spoiled labels are voided.
 - Reports may say "prepared with reference to the measurement framework of
   ISO 59020:2024" and must never say certified, compliant or conforms.

@@ -17,16 +17,17 @@ import InventoryReportPage from './pages/InventoryReportPage'
 import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
 import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
 import { AuthProvider, RequireAccount, RequireStaff, RequireSignedIn } from './lib/auth'
-import { hasBackend } from './lib/supabase'
+import { inMemoryDemo } from './lib/env'
+import { DemoBanner } from './components/DemoBanner'
 import './styles/index.css'
 
 /** Routing - Architecture sections 5 and 7.
- * Staff routes sit behind RequireStaff. In demo mode (?demo=1, or no backend
- * configured) the gate passes everyone through so walkthroughs need no
- * account. /c/:code is the QR landing route: the gate decides whether the
+ * Staff routes sit behind RequireStaff. In in-memory demo mode (no backend
+ * configured, or ?demo=1 during local development) the gate passes everyone
+ * through. Hosted builds always have a backend (Architecture section 20). /c/:code is the QR landing route: the gate decides whether the
  * visitor sees the staff card or the public page. */
 
-const demo = new URLSearchParams(location.search).has('demo') || !hasBackend
+const demo = inMemoryDemo
 const staff = (el: React.ReactNode) => <RequireStaff>{el}</RequireStaff>
 const account = (el: React.ReactNode) => <RequireAccount>{el}</RequireAccount>
 
@@ -42,7 +43,7 @@ function Root() {
       if (dwell < 4000 && !/^\/(login|c\/CLQ-\d+\/action)/.test(path)) track('bounce', path, { dwell_ms: dwell })
     }
   }, [loc.pathname])
-  return <Outlet />
+  return <><DemoBanner /><Outlet /></>
 }
 
 const router = createBrowserRouter([{ element: <Root />, children: [
