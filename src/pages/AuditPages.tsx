@@ -219,7 +219,7 @@ export function SightingPage() {
           <Field label="Quantity remaining (litres, if checked)"><input className={inputCls} inputMode="decimal" value={remaining} onChange={e => setRemaining(e.target.value)} /></Field>
           <Field label="Owned by">
             <select className={inputCls} value={ownership} onChange={e => setOwnership(e.target.value)}>
-              <option value="CUSTOMER">Customer</option><option value="CLARIQ">Clariq</option><option value="THIRD_PARTY">Third party</option>
+              <option value="CUSTOMER">The customer</option><option value="SUPPLIER">The supplier</option><option value="THIRD_PARTY">A third party</option>
             </select>
           </Field>
         </div>

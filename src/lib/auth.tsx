@@ -20,7 +20,29 @@ export type AppUser = {
   can_authorise: boolean
   role_code: string
   customer_id: string | null
+  /** Organisation (Architecture 21.1). Flags are independent: a university that
+   * imports is an end user and an introducer; a distributor is a supplier only. */
+  tenant_name: string
+  is_supplier: boolean
+  is_end_user: boolean
+  introducer: boolean
+  jurisdiction: 'AU' | 'NZ' | null
+  /** Supplier customer records that point at this organisation (21.2). An end
+   * user's lens is locked to the first; more than one means more than one
+   * Clariq supplier, picker to follow. */
+  linked_customer_ids: string[]
 }
+
+/** Which home a person gets, from the organisation's flags. */
+export type OrgMode = 'SUPPLIER' | 'END_USER' | 'BOTH'
+export function orgMode(user: AppUser | null): OrgMode {
+  if (!user) return 'SUPPLIER'
+  if (user.is_supplier && user.is_end_user) return 'BOTH'
+  return user.is_end_user ? 'END_USER' : 'SUPPLIER'
+}
+/** An organisation that only holds and uses chemicals. Its people are staff
+ * of their own tenant, but the screens read as the customer sees them. */
+export const isEndUserOrg = (user: AppUser | null) => orgMode(user) === 'END_USER'
 
 type AuthState = {
   loading: boolean
@@ -41,13 +63,23 @@ async function loadAppUser(userId: string): Promise<AppUser | null> {
   // exists and the app wrongly reports "no role".
   const { data, error } = await supabase
     .from('app_users')
-    .select('id, tenant_id, display_name, email, can_authorise, customer_id, roles(code)')
+    .select('id, tenant_id, display_name, email, can_authorise, customer_id, roles(code), tenants(name, is_supplier, is_end_user, introducer, jurisdiction)')
     .eq('id', userId)
     .maybeSingle()
   if (error || !data) return null
   const roles = data.roles as unknown as { code: string } | { code: string }[] | null
   const role_code = Array.isArray(roles) ? roles[0]?.code : roles?.code
-  return { ...data, role_code: role_code ?? '' } as AppUser
+  type T = { name: string; is_supplier: boolean; is_end_user: boolean; introducer: boolean; jurisdiction: 'AU' | 'NZ' | null }
+  const tRaw = (data as unknown as { tenants: T | T[] | null }).tenants
+  const t: T = (Array.isArray(tRaw) ? tRaw[0] : tRaw) ?? { name: '', is_supplier: true, is_end_user: false, introducer: false, jurisdiction: null }
+  // Customer records at linked suppliers that point at this organisation (policy customers_read_linked, 0040).
+  const { data: linked } = await supabase.from('customers').select('id').eq('linked_tenant_id', data.tenant_id)
+  const { tenants: _t, roles: _r, ...rest } = data as unknown as Record<string, unknown>
+  return {
+    ...rest, role_code: role_code ?? '',
+    tenant_name: t.name, is_supplier: t.is_supplier, is_end_user: t.is_end_user, introducer: t.introducer, jurisdiction: t.jurisdiction,
+    linked_customer_ids: (linked ?? []).map(c => c.id as string),
+  } as AppUser
 }
 
 /** Region motif from tenant settings (Architecture 14.1). Defaults to the fern. */
@@ -94,7 +126,7 @@ export const useAuth = () => useContext(AuthContext)
  * Held in sessionStorage so Menu and Guide can hide staff-only content until
  * the person returns to the staff view. Real customer users are always in it. */
 export function isCustomerView(user: AppUser | null) {
-  return user?.role_code === 'CUSTOMER' || sessionStorage.getItem('customerView') === '1'
+  return user?.role_code === 'CUSTOMER' || isEndUserOrg(user) || sessionStorage.getItem('customerView') === '1'
 }
 export function setCustomerView(on: boolean) {
   if (on) sessionStorage.setItem('customerView', '1'); else sessionStorage.removeItem('customerView')

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { gateway } from './supabaseGateway'
 import type { Option } from './gateway'
-import { useAuth, isCustomerView } from './auth'
+import { useAuth, isCustomerView, isEndUserOrg } from './auth'
 
 /** The customer lens. Held in the URL (?customer=) so it survives navigation
  * between Today, the status lists and the overdue list, and so a filtered view
@@ -13,7 +13,10 @@ import { useAuth, isCustomerView } from './auth'
 export function useCustomerFilter(): [string, (id: string) => void] {
   const [params, setParams] = useSearchParams()
   const { user } = useAuth()
-  const locked = user?.role_code === 'CUSTOMER' ? (user.customer_id ?? '') : null
+  // A customer user is locked to their customer. An end-user organisation is
+  // locked to the customer record its supplier holds for it (Architecture 21.2).
+  const locked = user?.role_code === 'CUSTOMER' ? (user.customer_id ?? '')
+    : isEndUserOrg(user) ? (user?.linked_customer_ids[0] ?? '') : null
   const id = locked ?? params.get('customer') ?? ''
   const set = (next: string) => {
     if (locked !== null) return
@@ -34,7 +37,7 @@ export function withCustomer(path: string, id: string) {
 export function useCustomerLens() {
   const { user } = useAuth()
   const [id] = useCustomerFilter()
-  return { customerId: id, customerView: isCustomerView(user), isCustomerUser: user?.role_code === 'CUSTOMER' }
+  return { customerId: id, customerView: isCustomerView(user), isCustomerUser: user?.role_code === 'CUSTOMER' || isEndUserOrg(user) }
 }
 
 /** Customer-view header: who this is, and where. Replaces the picker when the

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { gateway } from '../lib/supabaseGateway'
 import type { Dashboard } from '../lib/gateway'
 import { STATUS_META, statusLabel, type ContainerStatus } from '../lib/status'
-import { useAuth, setCustomerView } from '../lib/auth'
+import { useAuth, setCustomerView, isEndUserOrg } from '../lib/auth'
 import { CustomerBanner, CustomerPicker, useCustomerFilter, useCustomerLens, withCustomer } from '../lib/customerFilter'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { BigButton, Door, PageHead } from '../components/ui'
@@ -28,8 +28,20 @@ const GROUP_BORDER: Record<string, string> = {
 /** The home screen asks one question per role: the big verb, then at most
  * three doors (Architecture 21, decision 2026-08-30). Everything else is in
  * Menu. Labels are Clariq's words, signed off 30 Aug. */
-function HomeDoors({ role, customerView, customerId }: { role: string; customerView: boolean; customerId: string }) {
+function HomeDoors({ role, customerView, customerId, endUser }: { role: string; customerView: boolean; customerId: string; endUser?: boolean }) {
   const overdue = withCustomer('/dashboard/overdue', customerId)
+  // An end-user organisation's home (Architecture 21.9 item 3): what is on
+  // site, what is due back, and the audit walk. The report lives in Menu.
+  if (endUser) return (
+    <>
+      <BigButton to={withCustomer('/report/inventory', customerId)}>Chemicals on our sites</BigButton>
+      <div className="grid grid-cols-3 gap-2.5 mt-2.5">
+        <Door to={withCustomer('/dashboard/status/WITH_CUSTOMER', customerId)}>Our containers</Door>
+        <Door to={overdue}>What is due back</Door>
+        <Door to="/audit">Do an audit walk</Door>
+      </div>
+    </>
+  )
   if (customerView) return (
     <>
       <BigButton to={withCustomer('/dashboard/status/WITH_CUSTOMER', customerId)}>See my containers</BigButton>
@@ -69,6 +81,7 @@ export default function DashboardPage() {
   useEffect(() => { if (viewParam) setCustomerView(true) }, [viewParam])
   // A real customer user is always in customer view; an Admin is in it after "View as".
   const customerView = viewParam || lens.customerView
+  const endUser = isEndUserOrg(user)
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
 
   const overdueOnly = d?.overdue.filter(o => o.flag !== 'DUE_SOON') ?? []
@@ -79,7 +92,7 @@ export default function DashboardPage() {
     <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <BrandBar />
       <PageHead title={customerView ? 'Home' : 'Today'}
-        purpose={customerView ? 'Your containers, what is due back, and your report.' : 'What needs doing this morning, then the fleet at a glance.'}
+        purpose={endUser ? 'What is on your sites, what is due back, and the audit walk.' : customerView ? 'Your containers, what is due back, and your report.' : 'What needs doing this morning, then the fleet at a glance.'}
         help={customerView ? 'scan' : 'overdue'} />
       {tour && <FirstRun role={customerView ? 'CUSTOMER' : role} onDone={() => setTour(false)} />}
 
@@ -95,7 +108,7 @@ export default function DashboardPage() {
       ) : <div className="mb-5"><CustomerPicker /></div>}
 
       <section aria-label="Start here" className="mb-6">
-        <HomeDoors role={role} customerView={customerView} customerId={customerId} />
+        <HomeDoors role={role} customerView={customerView} customerId={customerId} endUser={endUser} />
       </section>
 
       {d && (

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../lib/auth'
 
 /** Brand surfaces - Architecture section 14.
  * The wordmark is supplied artwork and is never set in type. Every screen
@@ -14,6 +15,11 @@ export function Lockup({ className = 'h-6' }: { className?: string }) {
 /** Dark header bar. Left slot for a back link, right slot for actions. */
 export function BrandBar({ back, right, subtitle }:
   { back?: string; right?: ReactNode; subtitle?: string }) {
+  const { user } = useAuth()
+  // The organisation the person is signed in to (Architecture 21.1). Shown on
+  // every signed-in screen so a person with more than one account can tell
+  // which one this is. A supplied subtitle (public scan page) wins.
+  const org = subtitle ?? user?.tenant_name
   return (
     <header className="bg-bar text-bar-ink -mx-5 px-5 pt-safe">
       <div className="h-14 flex items-center justify-between max-w-md mx-auto">
@@ -29,8 +35,8 @@ export function BrandBar({ back, right, subtitle }:
           )}
         </div>
       </div>
-      {subtitle && (
-        <div className="text-center pb-3 text-xs tracking-[0.22em] text-bar-ink/70">{subtitle}</div>
+      {org && (
+        <div className="text-center pb-3 text-xs tracking-[0.22em] text-bar-ink/70">{org}</div>
       )}
     </header>
   )

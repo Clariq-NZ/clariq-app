@@ -5,6 +5,7 @@ import { BrandBar, AppFooter } from '../components/Brand'
 import { Field, inputCls, PrimaryButton, PageHead } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { tenantId, listLocations, addLocation, type Location } from '../lib/audit'
+import { useAuth, isEndUserOrg } from '../lib/auth'
 import { PRESETS, LEVELS, labelsFor, type LocationLabels } from '../lib/locationLabels'
 
 /** Stage 4 master data - Architecture section 8.1. Customers hold sites;
@@ -22,22 +23,21 @@ function Shell({ title, back, purpose, help, children }: { title: string; back: 
     </main>
   )
 }
-const nextCode = async (table: string, prefix: string, width: number) => {
-  const { count } = await sb().from(table).select('*', { count: 'exact', head: true })
-  return `${prefix}-${String((count ?? 0) + 1).padStart(width, '0')}`
-}
 
 export function CustomersPage() {
+  const { user } = useAuth()
+  const endUser = isEndUserOrg(user)
   const [rows, setRows] = useState<any[]>([])
-  useEffect(() => { sb().from('customers').select('id, code, trading_name, legal_name, account_status').is('archived_at', null).order('trading_name').then(r => setRows(r.data ?? [])) }, [])
+  useEffect(() => { sb().from('customers').select('id, code, trading_name, legal_name, account_status, linked_tenant_id').is('archived_at', null).order('trading_name').then(r => setRows(r.data ?? [])) }, [])
   return (
-    <Shell title="Customers and their sites" back="/menu" purpose="Who Clariq supplies, and where. Open a customer to add sites and locations." help="customer-setup">
-      <Link to="/admin/customers/new" className="block rounded bg-ink text-paper text-center py-3.5 font-semibold mb-4">Add a customer</Link>
+    <Shell title={endUser ? 'Our sites and locations' : 'Customers and their sites'} back="/menu"
+      purpose={endUser ? 'Where containers are kept. One entry per supplier that delivers to you.' : 'Who you supply, and where. Open a customer to add sites and locations, or to invite them onto Clariq.'} help="customer-setup">
+      {!endUser && <Link to="/admin/customers/new" className="block rounded bg-ink text-paper text-center py-3.5 font-semibold mb-4">Add a customer</Link>}
       <ul className="space-y-2">
         {rows.map(c => (
           <li key={c.id}><Link to={`/admin/customers/${c.id}`} className="block rounded border border-line bg-surface px-4 py-3">
             <span className="font-medium">{c.trading_name || c.legal_name}</span>
-            <span className="block text-sm text-ink-soft">{c.code}</span>
+            <span className="block text-sm text-ink-soft">{c.code}{c.linked_tenant_id && !endUser ? ' · on Clariq' : ''}</span>
           </Link></li>
         ))}
         {rows.length === 0 && <li className="text-ink-soft">No customers yet. Add the first one.</li>}
@@ -54,8 +54,7 @@ export function NewCustomerPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const t = await tenantId()
-    const code = await nextCode('customers', 'CUS', 4)
-    const { data, error } = await sb().from('customers').insert({ tenant_id: t, code, ...f, trading_name: f.trading_name || f.legal_name, account_status: 'ACTIVE', deposit_arrangement: 'NONE' }).select('id').single()
+    const { data, error } = await sb().from('customers').insert({ tenant_id: t, ...f, trading_name: f.trading_name || f.legal_name, account_status: 'ACTIVE', deposit_arrangement: 'NONE' }).select('id').single()
     if (error) { setErr(friendlyError(error)); return }
     nav(`/admin/customers/${(data as any).id}`)
   }
@@ -76,6 +75,8 @@ export function NewCustomerPage() {
 
 export function CustomerDetailPage() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const endUser = isEndUserOrg(user)
   const [c, setC] = useState<any>(null)
   const [sites, setSites] = useState<any[]>([])
   const [adding, setAdding] = useState(false)
@@ -88,8 +89,8 @@ export function CustomerDetailPage() {
   useEffect(() => { void load() }, [id])
   const addSite = async (e: React.FormEvent) => {
     e.preventDefault()
-    const t = await tenantId(); const code = await nextCode('sites', 'SITE', 4)
-    const { error } = await sb().from('sites').insert({ tenant_id: t, code, customer_id: id, name: site.name, region: site.region || null, address: { line1: site.address } })
+    const t = await tenantId()
+    const { error } = await sb().from('sites').insert({ tenant_id: t, customer_id: id, name: site.name, region: site.region || null, address: { line1: site.address } })
     if (!error) { setSite({ name: '', region: '', address: '' }); setAdding(false); void load() }
   }
   const saveLabels = async (next: LocationLabels) => { setLabels(next); await sb().from('customers').update({ location_labels: next }).eq('id', id!) }
@@ -98,6 +99,7 @@ export function CustomerDetailPage() {
   return (
     <Shell title={c.trading_name || c.legal_name} back="/admin/customers">
       <p className="text-sm text-ink-soft mb-5">{c.code} &middot; {c.primary_contact} {c.email && <>&middot; {c.email}</>}</p>
+      {!endUser && <OrganisationAccess customer={c} onChange={load} />}
       <details className="mb-6 rounded border border-line bg-surface px-4 py-3">
         <summary className="font-semibold cursor-pointer">Location names <span className="font-normal text-sm text-ink-soft">({PRESETS[labels.preset]?.name ?? 'Custom'})</span></summary>
         <p className="text-sm text-ink-soft mt-2 mb-3">Four levels, from largest to smallest. Pick the industry closest to this customer, then rename any level.</p>
@@ -116,7 +118,9 @@ export function CustomerDetailPage() {
           </Link></li>
         ))}
       </ul>
-      {adding ? (
+      {c.linked_tenant_id && !endUser ? (
+        <p className="text-sm text-ink-soft">This organisation manages its own sites and locations on Clariq. New sites appear here as they add them.</p>
+      ) : adding ? (
         <form onSubmit={addSite} className="space-y-3 rounded border border-line p-4 bg-surface">
           <Field label="Site name (campus, depot, plant)"><input className={inputCls} required value={site.name} onChange={e => setSite({ ...site, name: e.target.value })} /></Field>
           <Field label="Region or division"><input className={inputCls} value={site.region} onChange={e => setSite({ ...site, region: e.target.value })} /></Field>
@@ -125,6 +129,60 @@ export function CustomerDetailPage() {
         </form>
       ) : <button onClick={() => setAdding(true)} className="w-full rounded border border-line py-3 font-medium">Add a site</button>}
     </Shell>
+  )
+}
+
+/** Invite a customer onto Clariq as an organisation (Architecture 21.2).
+ * Creates the link and the first Admin invite via invite_customer_organisation.
+ * The invitee's first magic-link login creates their organisation. */
+function OrganisationAccess({ customer, onChange }: { customer: any; onChange: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [f, setF] = useState({ email: customer.email ?? '', name: customer.primary_contact ?? '', org: customer.trading_name || customer.legal_name || '', jurisdiction: customer.jurisdiction ?? 'NZ' })
+  const [link, setLink] = useState<any>(null)
+  const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [sent, setSent] = useState(false)
+  useEffect(() => {
+    sb().from('tenant_links').select('status, invited_at, accepted_at').eq('customer_id', customer.id).neq('status', 'ENDED').maybeSingle().then(r => setLink(r.data))
+  }, [customer.id])
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setErr(''); setBusy(true)
+    const { error } = await sb().rpc('invite_customer_organisation', {
+      p_customer_id: customer.id, p_admin_email: f.email, p_admin_display_name: f.name, p_tenant_name: f.org, p_jurisdiction: f.jurisdiction,
+    })
+    setBusy(false)
+    if (error) { setErr(friendlyError(error)); return }
+    setSent(true); setOpen(false); onChange()
+  }
+  const status = customer.linked_tenant_id ? 'ACTIVE' : link?.status
+  return (
+    <section className="mb-6 rounded border border-line bg-surface px-4 py-3">
+      <div className="text-xs tracking-[0.18em] text-ink-faint">ON CLARIQ</div>
+      {status === 'ACTIVE' && <p className="mt-1 text-sm">Linked organisation. Their people see the containers you deliver to them, and keep their own register.</p>}
+      {status === 'INVITED' && <p className="mt-1 text-sm">Invitation sent{link?.invited_at ? ` on ${new Date(link.invited_at).toLocaleDateString()}` : ''}. It takes effect when they first sign in.</p>}
+      {sent && !status && <p className="mt-1 text-sm">Invitation sent.</p>}
+      {!status && !sent && !open && (
+        <>
+          <p className="mt-1 text-sm text-ink-soft">Not on Clariq. Invite them and their first person becomes Admin of their own organisation.</p>
+          <button type="button" onClick={() => setOpen(true)} className="mt-2 rounded border border-line px-4 py-2 font-medium">Invite as an organisation</button>
+        </>
+      )}
+      {open && (
+        <form onSubmit={submit} className="mt-3 space-y-3">
+          <Field label="Organisation name"><input className={inputCls} required value={f.org} onChange={e => setF({ ...f, org: e.target.value })} /></Field>
+          <Field label="First Admin: name"><input className={inputCls} required value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
+          <Field label="First Admin: email"><input className={inputCls} type="email" required value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
+          <Field label="Jurisdiction">
+            <select className={inputCls} value={f.jurisdiction} onChange={e => setF({ ...f, jurisdiction: e.target.value })}>
+              <option value="NZ">New Zealand</option><option value="AU">Australia</option>
+            </select>
+          </Field>
+          {err && <p role="alert" className="text-status-overdue text-sm">{err}</p>}
+          <div className="flex gap-3">
+            <PrimaryButton disabled={busy}>{busy ? 'Sending' : 'Send invitation'}</PrimaryButton>
+            <button type="button" onClick={() => setOpen(false)} className="underline text-ink-soft">Cancel</button>
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 
@@ -168,8 +226,8 @@ export function ProductsPage() {
   useEffect(() => { void load() }, [])
   const add = async (e: React.FormEvent) => {
     e.preventDefault()
-    const t = await tenantId(); const code = await nextCode('products', 'PRD', 4)
-    const { error } = await sb().from('products').insert({ tenant_id: t, code, ...f, sds_url: f.sds_url || null })
+    const t = await tenantId()
+    const { error } = await sb().from('products').insert({ tenant_id: t, ...f, sds_url: f.sds_url || null })
     if (!error) { setF({ name: '', product_group: '', manufacturer: '', concentration: '', sds_url: '' }); void load() }
   }
   return (

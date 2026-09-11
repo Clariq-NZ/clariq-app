@@ -22,6 +22,7 @@ type Row = {
   product_name: string | null; batch_code: string | null; hazard_classes: string[]; signal_word: string | null
   sds_version: string | null; sds_issued_date: string | null; sds_review_due: string | null
   quantity_dispatched: number | null; quantity_remaining: number | null; sighted_at: string | null; basis: string
+  last_received_at: string | null; emptied_at: string | null
 }
 type Term = { code: string; label: string }
 
@@ -75,7 +76,12 @@ export default function InventoryReportPage() {
   const view: InventoryRow[] = useMemo(() => (rows ?? []).map(r => ({
     containerCode: r.container_code, typeCode: r.type_code, productName: r.product_name ?? 'Unrecorded', batchCode: r.batch_code,
     hazard: hazardText(r), signalWord: r.signal_word,
-    quantity: r.quantity_remaining ?? r.quantity_dispatched, basis: r.sighted_at ? `audited ${fmt(r.sighted_at)}` : 'as dispatched',
+    quantity: r.quantity_remaining ?? r.quantity_dispatched,
+    // Basis reads as the end user experiences it (Architecture 21.4): emptied
+    // beats audited beats as-dispatched; an unconfirmed receipt is said plainly.
+    basis: r.basis === 'MEASURED_EMPTIED' ? `emptied ${fmt(r.emptied_at)}`
+      : r.sighted_at ? `audited ${fmt(r.sighted_at)}`
+      : r.last_received_at ? 'as dispatched' : 'as dispatched, receipt unconfirmed',
     since: fmt(r.last_dispatch_at),
   })), [rows, hazardLabels])
   const totalQty = view.reduce((a, r) => a + (r.quantity ?? 0), 0)

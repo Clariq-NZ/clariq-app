@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
-import { useAuth, isCustomerView, setCustomerView } from '../lib/auth'
+import { useAuth, isCustomerView, setCustomerView, isEndUserOrg } from '../lib/auth'
 import { PageHead } from '../components/ui'
 import { resetFirstRun } from '../components/FirstRun'
 import { useNavigate } from 'react-router-dom'
@@ -11,9 +11,14 @@ export default function MenuPage() {
   const { user, signOut } = useAuth()
   const nav = useNavigate()
   const cv = isCustomerView(user)
+  // An end-user organisation (Architecture 21.1): its people are Admin and
+  // staff of their own tenant, so they audit and set up sites, but the fleet
+  // screens (queue, labels, customers) belong to the supplier.
+  const endUser = isEndUserOrg(user)
   const role = cv ? 'CUSTOMER' : (user?.role_code ?? 'ADMIN')
-  const admin = !cv && (!user || user.role_code === 'ADMIN')
+  const admin = (!cv || endUser) && (!user || user.role_code === 'ADMIN')
   const staff = !cv
+  const myCustomer = user?.linked_customer_ids[0]
   const Item = ({ to, label, sub }: { to: string; label: string; sub?: string }) => (
     <Link to={to} className="block rounded border border-line bg-surface px-4 py-3.5 min-h-[56px]">
       <span className="block font-medium">{label}</span>
@@ -30,7 +35,7 @@ export default function MenuPage() {
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
       <BrandBar back="/dashboard" />
       <PageHead title="Menu" purpose="Everything, grouped by what you came to do." help="scan" />
-      {cv && user?.role_code !== 'CUSTOMER' && (
+      {cv && !endUser && user?.role_code !== 'CUSTOMER' && (
         <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">Customer view. <button onClick={() => setCustomerView(false)} className="underline font-medium">Back to staff view</button></p>
       )}
       <Group title="EVERY DAY">
@@ -38,7 +43,7 @@ export default function MenuPage() {
         <Item to="/dashboard" label={cv ? 'Home' : 'Today: what needs doing'} sub={cv ? 'Your containers and what is due back' : 'Overdue for return, then the fleet by status'} />
         {staff && <Item to="/dashboard/queue" label="Check a container" sub="Waiting for a wash or an inspection" />}
         {staff && <Item to="/dashboard/overdue" label="What is overdue for return" />}
-        {staff && <Item to="/audit" label="Do an audit walk" sub="Walk a site, sight every container" />}
+        {(staff || endUser) && <Item to="/audit" label="Do an audit walk" sub="Walk a site, sight every container" />}
       </Group>
       <Group title="REPORTS">
         <Item to="/dashboard/circularity" label="Reuse results" sub="How many times containers went round, and what that saved" />
@@ -46,12 +51,18 @@ export default function MenuPage() {
         <Item to="/report/inventory" label={cv ? 'Chemicals on my site' : 'Chemicals on site'} sub="What is at a location right now" />
         {admin && <Item to="/admin/view-as" label="See what a customer sees" />}
       </Group>
-      {admin && (
+      {admin && !endUser && (
         <Group title="SET UP">
           <Item to="/admin/customers" label="Customers and their sites" />
           <Item to="/admin/products" label="Products" />
           <Item to="/admin/new-containers" label="Print new labels" />
           <Item to="/admin/settings" label="Settings" sub="Region motif, overdue thresholds" />
+        </Group>
+      )}
+      {admin && endUser && (
+        <Group title="SET UP">
+          <Item to={myCustomer ? `/admin/customers/${myCustomer}` : '/admin/customers'} label="Our sites and locations" sub="Where containers are kept: campus, building, room, cabinet" />
+          <Item to="/admin/settings" label="Settings" sub="Region motif" />
         </Group>
       )}
       <Group title="HELP">
