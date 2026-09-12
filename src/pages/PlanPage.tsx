@@ -78,7 +78,7 @@ export function PlanPage() {
       { code: 'register_all', label: 'Produce the register for all sites', detail: 'Same report, "All sites" at the top', to: '/report/inventory' },
     ] },
     ...(user?.introducer ? [{ title: 'AICIS', when: 'Before 30 November', offsetDays: 0, tasks: [
-      { code: 'first_delivery', label: 'Record each imported delivery as it arrives', detail: 'Four questions; the introduction record builds itself', to: '/deliveries/new', auto: true },
+      { code: 'first_delivery', label: 'Record each imported delivery as it arrives (AICIS)', detail: 'Four questions; the introduction record builds itself', to: '/deliveries/new', auto: true },
       { code: 'identities', label: 'Complete every chemical identity', detail: 'CAS number and name, or ask the supplier and record the ask', to: '/chemicals', auto: true },
       { code: 'evidence', label: 'Attach the records that apply', detail: 'Shipping documents, SDS, declarations; one upload covers every item it satisfies', to: '/chemicals', auto: true },
       { code: 'pack', label: 'Download the prep pack in October', detail: 'Check volumes against limits and what is still outstanding', to: '/chemicals/pack' },

@@ -89,10 +89,11 @@ export function ChemicalsPage() {
     sb().from('v_chemical_summary').select('*').eq('registration_year', year).order('common_name').then(r => setRows((r.data ?? []) as Summary[]))
   }, [year])
   return (
-    <Shell title="Chemicals we import" back="/menu"
-      purpose={`Everything imported this AICIS year (1 September ${year} to 31 August ${year + 1}), what is held for each, and the next thing to do.`}>
+    <Shell title="AICIS record" back="/menu"
+      purpose={`The chemicals your organisation imported this AICIS registration year (1 September ${year} to 31 August ${year + 1}), what is held for each, and the next thing to do. Your annual declaration is due 30 November.`}>
       <Link to="/deliveries/new" className="block rounded bg-ink text-paper text-center py-3.5 font-semibold mb-2">Record a delivery</Link>
       <Link to="/chemicals/pack" className="block rounded border border-line bg-surface text-center py-3 font-medium mb-4">AICIS annual declaration prep pack</Link>
+      <p className="text-xs text-ink-soft mb-4">AICIS is the Australian Industrial Chemicals Introduction Scheme. An organisation that imports or manufactures industrial chemicals keeps records for each one and declares each year that its introductions were authorised. Clariq holds the records; the declaration stays yours.</p>
       {rows && rows.length === 0 && (
         <p className="text-ink-soft mb-4">Nothing recorded this year yet. Record a delivery and the record starts itself.</p>
       )}
@@ -110,9 +111,7 @@ export function ChemicalsPage() {
           </li>
         ))}
       </ul>
-      {user?.introducer && rows && rows.length > 0 && (
-        <p className="mt-6 text-xs text-ink-faint">The prep pack and evidence pack are prepared to support obligations under the Industrial Chemicals Act 2019. Whether an introduction is authorised is your declaration to make.</p>
-      )}
+      <p className="mt-6 text-xs text-ink-faint">The prep pack and evidence pack are prepared to support obligations under the Industrial Chemicals Act 2019. Whether an introduction is authorised is your declaration to make.</p>
     </Shell>
   )
 }

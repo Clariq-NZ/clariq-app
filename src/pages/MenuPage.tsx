@@ -39,6 +39,13 @@ export default function MenuPage() {
   const admin = (!cv || endUser) && (!user || user.role_code === 'ADMIN')
   const staff = !cv
   const myCustomer = user?.linked_customer_ids[0]
+  // Leaving customer view has to clear the flag, drop the customer lens and
+  // the ?view=customer parameter, and land somewhere fresh. Clearing the flag
+  // alone left the page as it was (fixed 12 Sep).
+  const leaveCustomerView = () => {
+    setCustomerView(false)
+    window.location.assign('/dashboard')
+  }
   const Item = ({ to, label, sub }: { to: string; label: string; sub?: string }) => (
     <Link to={to} className="block rounded border border-line bg-surface px-4 py-3.5 min-h-[56px]">
       <span className="block font-medium">{label}</span>
@@ -50,7 +57,7 @@ export default function MenuPage() {
       <BrandBar back="/dashboard" />
       <PageHead title="Menu" purpose="Everything, grouped by what you came to do." help="scan" />
       {cv && !endUser && user?.role_code !== 'CUSTOMER' && (
-        <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">Customer view. <button onClick={() => setCustomerView(false)} className="underline font-medium">Back to staff view</button></p>
+        <p className="mb-5 rounded border border-accent bg-accent/15 px-4 py-3 text-sm">Customer view. <button onClick={leaveCustomerView} className="underline font-medium">Back to staff view</button></p>
       )}
       <Group title="EVERY DAY">
         <Item to="/scan" label="Scan a container" sub="See what is in it and what can happen next" />
@@ -84,10 +91,10 @@ export default function MenuPage() {
         </Group>
       )}
       {user?.introducer && (
-        <Group title="CHEMICALS WE IMPORT">
-          {admin && <Item to="/deliveries/new" label="Record a delivery" sub="Four questions; the AICIS record builds itself" />}
-          <Item to="/chemicals" label="Chemicals we import" sub="What is held for each, and the next thing to do" />
-          <Item to="/chemicals/pack" label="AICIS prep pack" sub="The annual declaration, prepared. Due 30 November" />
+        <Group title="AICIS: CHEMICALS WE IMPORT">
+          {admin && <Item to="/deliveries/new" label="Record an imported delivery" sub="Four questions; the AICIS record builds itself" />}
+          <Item to="/chemicals" label="AICIS record: chemicals we import" sub="What is held for each chemical, and the next thing to do" />
+          <Item to="/chemicals/pack" label="AICIS annual declaration prep pack" sub="Everything in one place. Due 30 November" />
           {admin && endUser && <Item to="/admin/products" label="Products we buy" sub="What arrives, with its safety data sheet" />}
         </Group>
       )}
