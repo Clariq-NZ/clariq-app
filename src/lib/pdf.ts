@@ -173,6 +173,9 @@ export async function buildCustomerReportPdf(r: ReportData) {
 export interface InventoryRow {
   containerCode: string; typeCode: string; productName: string; batchCode: string | null
   hazard: string; signalWord: string | null; quantity: number | null; basis: string; since: string
+  /** Site name when the report spans several sites; rows are grouped by it. */
+  site?: string
+  where?: string
 }
 export interface InventoryReportData {
   customerName: string; siteName: string; jurisdiction: 'AU' | 'NZ'; listingTerm: string; schemeTerm: string
@@ -219,16 +222,27 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
   for (const [h, q] of byHazard) text(`${h}: ${q} L`, 9.5, reg, SOFT, L + 4 * MM)
   y -= 3 * MM
 
-  // Listing
+  // Listing. Columns sized to A4 (16 mm margins, 178 mm usable): the basis
+  // column is short codes so nothing runs past the right edge.
   text('Listing', 10, bold, SOFT)
-  const cols = [L, L + 26 * MM, L + 72 * MM, L + 112 * MM, L + 148 * MM, L + 168 * MM]
-  const head = ['Container', 'Product', 'Hazard', 'Batch', 'Qty (L)', 'Basis']
-  head.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: FAINT })); y -= 5 * MM
+  const cols = [L, L + 24 * MM, L + 66 * MM, L + 100 * MM, L + 128 * MM, L + 142 * MM]
+  const widths = [22, 40, 32, 26, 12, 50]
+  const head = ['Container', 'Product', 'Hazard', 'Batch', 'Qty (L)', 'Basis / where']
+  const fit = (t: string, w: number, size: number, font = reg) => { let out = t; while (out.length > 1 && font.widthOfTextAtSize(out, size) > w * MM) out = out.slice(0, -1); return out === t ? t : out.slice(0, -1) + '\u2026' }
+  const shortBasis = (b: string) => b.replace('as dispatched, receipt unconfirmed', 'unconfirmed').replace('as dispatched, assumed received', 'assumed').replace('as dispatched', 'dispatched')
+  const drawHead = () => { head.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: FAINT })); y -= 5 * MM }
+  drawHead()
+  let currentSite: string | undefined
+  const grouped = r.rows.some(x => x.site)
   for (const x of r.rows) {
-    if (y < 26 * MM) { newPage(); head.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: FAINT })); y -= 5 * MM }
+    if (y < 26 * MM) { newPage(); drawHead() }
+    if (grouped && x.site !== currentSite) {
+      currentSite = x.site; y -= 1 * MM
+      page.drawText(fit(x.site ?? '', 170, 9, bold), { x: L, y, size: 9, font: bold, color: SOFT }); y -= 5.5 * MM
+    }
     rule()
-    const cells = [x.containerCode, x.productName.slice(0, 26), x.hazard.slice(0, 22), x.batchCode ?? '', x.quantity == null ? '' : String(x.quantity), x.basis]
-    cells.forEach((c, i) => page.drawText(c, { x: cols[i], y, size: 8.5, font: i === 0 ? bold : reg, color: INK }))
+    const cells = [x.containerCode, x.productName, x.hazard, x.batchCode ?? '', x.quantity == null ? '' : String(x.quantity), shortBasis(x.basis) + (x.where ? ' / ' + x.where : '')]
+    cells.forEach((c, i) => page.drawText(fit(c, widths[i], 8.5, i === 0 ? bold : reg), { x: cols[i], y, size: 8.5, font: i === 0 ? bold : reg, color: INK }))
     y -= 6 * MM
   }
   if (r.unaccounted.length) {
@@ -323,4 +337,138 @@ export function download(bytes: Uint8Array, filename: string) {
   const a = document.createElement('a')
   a.href = url; a.download = filename; a.click()
   URL.revokeObjectURL(url)
+}
+
+/* ---------------------------------------------------------------------------
+ * AICIS prep pack and evidence pack (Architecture 22.7, report registry).
+ * Both are prepared to support obligations under the Industrial Chemicals
+ * Act 2019. Neither says authorised, compliant, certified or conforms; the
+ * sentence at the foot comes from framework_sentence() and the status
+ * vocabulary is held, outstanding, not needed, someone else holds it.
+ * ------------------------------------------------------------------------- */
+
+export interface AicisPackRow {
+  name: string; identity: string; category: string; volumeKg: number | null; limitKg: number | null; basis: string
+  held: number; applicable: number; next: string | null
+}
+export interface AicisPackData {
+  organisation: string; registrationRef: string | null; periodLabel: string; preparedOn: string; sentence: string
+  rows: AicisPackRow[]
+  declarations: { kind: string; reference: string | null; submitted: string | null; year: number }[]
+  requests: { chemical: string; party: string; asked: string; outcome: string | null }[]
+  demo?: boolean
+}
+
+function makeDoc() {
+  return (async () => {
+    const doc = await PDFDocument.create()
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+    const reg = await doc.embedFont(StandardFonts.Helvetica)
+    const logo = await doc.embedPng(await fetch(logoUrl).then(res => res.arrayBuffer()))
+    const W = 210 * MM, H = 297 * MM, L = 16 * MM, R = 194 * MM
+    let page = doc.addPage([W, H]); let y = 0
+    const st = { get page() { return page }, get y() { return y }, set y(v: number) { y = v } }
+    const fit = (t: string, w: number, size: number, font = reg) => { let out = t; while (out.length > 1 && font.widthOfTextAtSize(out, size) > w * MM) out = out.slice(0, -1); return out === t ? t : out.slice(0, -1) + '\u2026' }
+    let footerText = ''
+    const footer = () => page.drawText(footerText, { x: L, y: 14 * MM, size: 7.5, font: reg, color: FAINT, maxWidth: R - L })
+    const newPage = () => { footer(); page = doc.addPage([W, H]); y = H - 20 * MM }
+    const text = (t: string, size: number, font = reg, color = INK, x = L, maxWidth = R - L) => {
+      if (y < 24 * MM) newPage()
+      page.drawText(t, { x, y, size, font, color, maxWidth, lineHeight: size * 1.35 })
+      const lines = Math.max(1, Math.ceil(font.widthOfTextAtSize(t, size) / (maxWidth)))
+      y -= size * 1.35 * lines + size * 0.35
+    }
+    const rule = () => page.drawLine({ start: { x: L, y: y + 3.2 * MM }, end: { x: R, y: y + 3.2 * MM }, thickness: 0.4, color: rgb(0.87, 0.86, 0.84) })
+    const header = (kicker: string, title: string, sub: string, meta: string) => {
+      const lw = 42 * MM, lh = lw * (logo.height / logo.width)
+      page.drawImage(logo, { x: L, y: H - 16 * MM - lh, width: lw, height: lh })
+      y = H - 40 * MM
+      text(kicker.toUpperCase(), 8.5, reg, FAINT); y -= 2 * MM
+      text(title, 20, bold)
+      text(sub, 12, reg, SOFT); y -= 1 * MM
+      text(meta, 9.5, reg, SOFT); y -= 5 * MM
+    }
+    const table = (head: string[], cols: number[], widths: number[], rows: string[][], emphasisCol = 0) => {
+      const drawHead = () => { head.forEach((h, i) => page.drawText(h, { x: L + cols[i] * MM, y, size: 8, font: bold, color: FAINT })); y -= 5 * MM }
+      drawHead()
+      for (const r of rows) {
+        if (y < 26 * MM) { newPage(); drawHead() }
+        rule()
+        r.forEach((c, i) => page.drawText(fit(c, widths[i], 8.5, i === emphasisCol ? bold : reg), { x: L + cols[i] * MM, y, size: 8.5, font: i === emphasisCol ? bold : reg, color: INK }))
+        y -= 6 * MM
+      }
+    }
+    const finish = async (foot: string) => { footerText = foot; footer(); return doc.save() }
+    return { doc, bold, reg, L, R, W, H, st, text, rule, header, table, newPage, finish, fit }
+  })()
+}
+
+export async function buildAicisPrepPackPdf(d: AicisPackData) {
+  const p = await makeDoc()
+  p.header('AICIS annual declaration prep pack' + (d.demo ? '   (DEMO DATA)' : ''), d.organisation,
+    d.periodLabel, 'Prepared ' + d.preparedOn + (d.registrationRef ? '   |   AICIS registration: ' + d.registrationRef : ''))
+
+  const byCat = new Map<string, number>()
+  for (const r of d.rows) byCat.set(r.category, (byCat.get(r.category) ?? 0) + 1)
+  const totalKg = d.rows.reduce((a, r) => a + (r.volumeKg ?? 0), 0)
+  const held = d.rows.reduce((a, r) => a + r.held, 0), app = d.rows.reduce((a, r) => a + r.applicable, 0)
+  p.text('Summary', 10, p.bold, SOFT)
+  p.text(`${d.rows.length} chemicals introduced, ${Math.round(totalKg)} kg in total. Records held: ${held} of ${app} items that apply.`, 10)
+  for (const [c, n] of byCat) p.text(`${c}: ${n}`, 9.5, p.reg, SOFT, p.L + 4 * MM)
+  p.st.y -= 3 * MM
+
+  p.text('Chemicals', 10, p.bold, SOFT)
+  p.table(['Chemical', 'Identity', 'How AICIS sees it', 'This period', 'Records', 'Next'],
+    [0, 46, 74, 118, 140, 154], [44, 26, 42, 20, 12, 40],
+    d.rows.map(r => [r.name, r.identity, r.category, (r.volumeKg == null ? '' : `${r.volumeKg} kg`) + (r.limitKg ? ` / ${r.limitKg}` : '') + (r.basis === 'ESTIMATED' ? ' est.' : ''), `${r.held}/${r.applicable}`, r.next ?? 'complete']))
+  p.st.y -= 4 * MM
+
+  p.text('Declarations and reports lodged', 10, p.bold, SOFT)
+  if (!d.declarations.length) p.text('None recorded for this period.', 9.5, p.reg, SOFT)
+  for (const x of d.declarations) p.text(`${x.kind} ${x.year}${x.reference ? ': ' + x.reference : ''}${x.submitted ? ', lodged ' + x.submitted : ', not yet lodged'}`, 9.5, p.reg, SOFT, p.L + 4 * MM)
+  p.st.y -= 3 * MM
+
+  p.text('Identity requests to suppliers', 10, p.bold, SOFT)
+  if (!d.requests.length) p.text('None.', 9.5, p.reg, SOFT)
+  for (const x of d.requests) p.text(`${x.chemical}: asked ${x.party} on ${x.asked}, ${x.outcome ? x.outcome.toLowerCase() : 'no reply yet'}`, 9.5, p.reg, SOFT, p.L + 4 * MM)
+  p.st.y -= 4 * MM
+
+  p.text('About this pack', 10, p.bold, SOFT)
+  p.text('Volumes are derived from recorded deliveries through product composition; "est." marks a figure estimated from a volume rather than a measured mass. Record status describes what the organisation holds. Whether each introduction is authorised is the introducer\u2019s own declaration to AICIS, which this pack helps prepare and does not replace.', 8.5, p.reg, SOFT)
+  return p.finish(d.sentence + '   |   clariq.nz')
+}
+
+export interface AicisEvidenceData {
+  organisation: string; chemical: string; identity: string; category: string; year: string; preparedOn: string; sentence: string
+  volume: string; endUse: string | null; authorityRef: string | null
+  requirements: { title: string; status: string; detail: string | null }[]
+  documents: { title: string; kind: string }[]
+  batches: { code: string; received: string; quantity: string; supplier: string | null; lot: string | null }[]
+  requests: { party: string; asked: string; outcome: string | null }[]
+  demo?: boolean
+}
+
+export async function buildAicisEvidencePackPdf(d: AicisEvidenceData) {
+  const p = await makeDoc()
+  p.header('AICIS evidence pack, one chemical' + (d.demo ? '   (DEMO DATA)' : ''), d.chemical, d.organisation + '   |   ' + d.year,
+    'Prepared ' + d.preparedOn + '   |   Identity: ' + d.identity + '   |   ' + d.category)
+  p.text('Introduction', 10, p.bold, SOFT)
+  p.text(`Volume this year: ${d.volume}${d.authorityRef ? '   |   Reference: ' + d.authorityRef : ''}${d.endUse ? '   |   Use: ' + d.endUse : ''}`, 9.5)
+  p.st.y -= 3 * MM
+  p.text('What AICIS asks to be held', 10, p.bold, SOFT)
+  p.table(['Requirement', 'Status', 'Evidence'], [0, 80, 106], [78, 24, 72], d.requirements.map(r => [r.title, r.status, r.detail ?? '']))
+  p.st.y -= 4 * MM
+  p.text('Documents on file', 10, p.bold, SOFT)
+  if (!d.documents.length) p.text('None attached.', 9.5, p.reg, SOFT)
+  for (const x of d.documents) p.text(`${x.title} (${x.kind.toLowerCase().replace(/_/g, ' ')})`, 9.5, p.reg, SOFT, p.L + 4 * MM)
+  p.st.y -= 3 * MM
+  p.text('Deliveries this year', 10, p.bold, SOFT)
+  p.table(['Batch', 'Received', 'Quantity', 'Supplier', 'Their lot'], [0, 30, 56, 84, 136], [28, 24, 26, 50, 38], d.batches.map(b => [b.code, b.received, b.quantity, b.supplier ?? '', b.lot ?? '']))
+  p.st.y -= 3 * MM
+  p.text('Identity requests', 10, p.bold, SOFT)
+  if (!d.requests.length) p.text('None.', 9.5, p.reg, SOFT)
+  for (const x of d.requests) p.text(`Asked ${x.party} on ${x.asked}, ${x.outcome ? x.outcome.toLowerCase() : 'no reply yet'}`, 9.5, p.reg, SOFT, p.L + 4 * MM)
+  p.st.y -= 4 * MM
+  p.text('This pack assembles the records held for one chemical so they can be produced within the timeframe AICIS specifies. Whether the introduction is authorised is the introducer\u2019s own declaration.', 8.5, p.reg, SOFT)
+  return p.finish(d.sentence + '   |   clariq.nz')
 }

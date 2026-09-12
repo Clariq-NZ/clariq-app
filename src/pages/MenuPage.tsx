@@ -71,6 +71,7 @@ export default function MenuPage() {
           <Item to="/admin/products" label="Products" />
           <Item to="/admin/new-containers" label="Print new labels" />
           <Item to="/admin/users" label="People" sub="Who can sign in, and what each person can do" />
+          <Item to="/plan" label="Bringing Clariq into use" sub="The pathway, phase by phase, with dates and to-dos" />
           <Item to="/admin/settings" label="Settings" sub="Region motif, overdue thresholds" />
         </Group>
       )}
@@ -78,6 +79,7 @@ export default function MenuPage() {
         <Group title="SET UP">
           <Item to={myCustomer ? `/admin/customers/${myCustomer}` : '/admin/customers'} label="Our sites and locations" sub="Where containers are kept: campus, building, room, cabinet" />
           <Item to="/admin/users" label="People" sub="Who can sign in, and what each person can do" />
+          <Item to="/plan" label="Bringing Clariq into use" sub="The pathway, phase by phase, with dates and to-dos" />
           <Item to="/admin/settings" label="Settings" sub="Region motif" />
         </Group>
       )}
@@ -85,6 +87,7 @@ export default function MenuPage() {
         <Group title="CHEMICALS WE IMPORT">
           {admin && <Item to="/deliveries/new" label="Record a delivery" sub="Four questions; the AICIS record builds itself" />}
           <Item to="/chemicals" label="Chemicals we import" sub="What is held for each, and the next thing to do" />
+          <Item to="/chemicals/pack" label="AICIS prep pack" sub="The annual declaration, prepared. Due 30 November" />
           {admin && endUser && <Item to="/admin/products" label="Products we buy" sub="What arrives, with its safety data sheet" />}
         </Group>
       )}

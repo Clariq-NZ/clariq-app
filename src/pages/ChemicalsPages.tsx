@@ -91,7 +91,8 @@ export function ChemicalsPage() {
   return (
     <Shell title="Chemicals we import" back="/menu"
       purpose={`Everything imported this AICIS year (1 September ${year} to 31 August ${year + 1}), what is held for each, and the next thing to do.`}>
-      <Link to="/deliveries/new" className="block rounded bg-ink text-paper text-center py-3.5 font-semibold mb-4">Record a delivery</Link>
+      <Link to="/deliveries/new" className="block rounded bg-ink text-paper text-center py-3.5 font-semibold mb-2">Record a delivery</Link>
+      <Link to="/chemicals/pack" className="block rounded border border-line bg-surface text-center py-3 font-medium mb-4">AICIS annual declaration prep pack</Link>
       {rows && rows.length === 0 && (
         <p className="text-ink-soft mb-4">Nothing recorded this year yet. Record a delivery and the record starts itself.</p>
       )}
@@ -129,6 +130,34 @@ export function ChemicalDetailPage() {
   const [uploading, setUploading] = useState(false); const [kind, setKind] = useState('SHIPPING_DOCUMENT')
   const [holderFor, setHolderFor] = useState<string | null>(null); const [holder, setHolder] = useState({ party: '', contact: '', basis: '' })
   const [asking, setAsking] = useState(false); const [ask, setAsk] = useState({ party: '', contact: '' })
+  const [packBusy, setPackBusy] = useState(false)
+  const { user } = useAuth()
+  const evidencePack = async () => {
+    if (!sum) return
+    setPackBusy(true); setErr('')
+    try {
+      const [{ data: batches }, { data: reqs }, { data: docsAll }, { data: sent }] = await Promise.all([
+        sb().from('chemical_batches').select('code, received_date, quantity_received, quantity_unit, supplier, supplier_lot').eq('introduction_id', sum.introduction_id).order('received_date'),
+        sb().from('identity_requests').select('asked_party, asked_at, outcome').eq('chemical_id', sum.chemical_id).order('asked_at'),
+        sb().from('documents').select('id, title, kind').in('id', rows.map(r => r.document_id).filter(Boolean) as string[]),
+        sb().rpc('framework_sentence', { p_code: 'AICIS_EVIDENCE_PACK' }),
+      ])
+      const { buildAicisEvidencePackPdf, download } = await import('../lib/pdf')
+      const label = (st: string) => st === 'HELD' ? 'Held' : st === 'RELIED_ON_THIRD_PARTY' ? 'Third party' : st === 'NOT_APPLICABLE' ? 'Not needed' : st === 'SATISFIED_BY_GROUP' ? 'Covered' : 'Outstanding'
+      const bytes = await buildAicisEvidencePackPdf({
+        organisation: user?.tenant_name ?? '', chemical: sum.common_name, identity: sum.cas_number ? `CAS ${sum.cas_number}` : 'not confirmed', category: categoryText(sum.category, sum.exemption_type),
+        year: `Registration year ${sum.registration_year}`, preparedOn: fmtDate(new Date().toISOString()), sentence: (sent as string) ?? '',
+        volume: `${sum.volume_kg ?? 0} kg${sum.volume_limit_kg ? ` of ${sum.volume_limit_kg}` : ''} (${(sum.basis ?? 'estimated').toLowerCase()})`, endUse: null, authorityRef: null,
+        requirements: order.map(r => ({ title: r.title, status: label(r.effective_status), detail: r.document_id ? (docs[r.document_id] ?? 'document on file') : r.holder_party ? `Held by ${r.holder_party}` : r.held_from_record ? 'From the chemical record' : null })),
+        documents: (docsAll ?? []).map((d: any) => ({ title: d.title, kind: d.kind })),
+        batches: (batches ?? []).map((b: any) => ({ code: b.code, received: fmtDate(b.received_date), quantity: `${b.quantity_received} ${b.quantity_unit}`, supplier: b.supplier, lot: b.supplier_lot })),
+        requests: (reqs ?? []).map((r: any) => ({ party: r.asked_party, asked: fmtDate(r.asked_at), outcome: r.outcome })),
+        demo: (user?.tenant_name ?? '').includes('Riverside'),
+      })
+      download(bytes, `Clariq-AICIS-evidence-${sum.common_name.replace(/\s+/g, '-')}.pdf`)
+    } catch (e) { setErr(friendlyError(e)) }
+    setPackBusy(false)
+  }
 
   const load = async () => {
     const { data: s } = await sb().from('v_chemical_summary').select('*').eq('introduction_id', id!).maybeSingle(); setSum(s as Summary)
@@ -225,6 +254,8 @@ export function ChemicalDetailPage() {
           ) : <button type="button" onClick={() => setAsking(true)} className="rounded border border-line px-4 py-2 font-medium">Ask now</button>}
         </section>
       )}
+
+      <button type="button" onClick={evidencePack} disabled={packBusy} className="w-full mb-5 min-h-[48px] rounded-xl border border-line bg-surface font-medium">{packBusy ? 'Building the PDF' : 'Download the evidence pack for this chemical (PDF)'}</button>
 
       <h2 className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">What AICIS asks you to hold</h2>
       <ul className="space-y-2">
@@ -415,6 +446,107 @@ export function DeliveryPage() {
         {err && <p role="alert" className="text-status-overdue text-sm">{err}</p>}
         <PrimaryButton disabled={busy}>{busy ? 'Saving' : 'Save delivery'}</PrimaryButton>
       </form>
+    </Shell>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * AICIS prep pack: the page an introducer opens in October. One period
+ * selector, the numbers, the chemicals, the declarations, one download.
+ * ------------------------------------------------------------------------- */
+
+type PackRow = Summary & { period_kg: number | null }
+
+export function AicisPackPage() {
+  const { user } = useAuth()
+  const now = new Date()
+  const regYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1
+  const [period, setPeriod] = useState<'REG' | 'FY'>('REG')
+  const [rows, setRows] = useState<PackRow[]>([])
+  const [decls, setDecls] = useState<any[]>([])
+  const [reqs, setReqs] = useState<any[]>([])
+  const [sentence, setSentence] = useState('')
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+
+  // Registration year runs 1 Sep to 31 Aug; the financial year 1 Jul to 30 Jun is what
+  // AICIS asks for at registration renewal. Volumes follow the chosen window; records
+  // follow the registration-year introduction, which is how the obligation is framed.
+  const win = period === 'REG'
+    ? { from: `${regYear}-09-01`, to: `${regYear + 1}-08-31`, label: `Registration year 1 September ${regYear} to 31 August ${regYear + 1}` }
+    : { from: `${now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1}-07-01`, to: `${now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear()}-06-30`, label: `Financial year 1 July ${now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1} to 30 June ${now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear()}` }
+
+  useEffect(() => {
+    if (!user) return
+    ;(async () => {
+      const [s, v, d, r, f] = await Promise.all([
+        sb().from('v_chemical_summary').select('*').eq('registration_year', regYear).order('common_name'),
+        sb().from('chemical_batch_volumes').select('chemical_id, chemical_kg, received_date').gte('received_date', win.from).lte('received_date', win.to),
+        sb().from('declarations').select('kind, reference, submitted_at, registration_year').in('registration_year', [regYear, regYear - 1]).order('submitted_at', { ascending: false }),
+        sb().from('identity_requests').select('asked_party, asked_at, outcome, chemicals(common_name)').order('asked_at', { ascending: false }),
+        sb().rpc('framework_sentence', { p_code: 'AICIS_PREP_PACK' }),
+      ])
+      const kg = new Map<string, number>()
+      for (const b of (v.data ?? []) as any[]) kg.set(b.chemical_id, (kg.get(b.chemical_id) ?? 0) + Number(b.chemical_kg ?? 0))
+      setRows(((s.data ?? []) as Summary[]).map(x => ({ ...x, period_kg: kg.has(x.chemical_id) ? Math.round(kg.get(x.chemical_id)! * 1000) / 1000 : null })))
+      setDecls(d.data ?? []); setReqs(r.data ?? []); setSentence((f.data as string) ?? '')
+    })()
+  }, [user, regYear, period])
+
+  const total = rows.reduce((a, r) => a + (r.period_kg ?? 0), 0)
+  const held = rows.reduce((a, r) => a + r.held, 0), app = rows.reduce((a, r) => a + r.applicable, 0)
+  const byCat = rows.reduce<Record<string, number>>((m, r) => { const k = CATEGORY_WORDS[r.category]; m[k] = (m[k] ?? 0) + 1; return m }, {})
+
+  const download = async () => {
+    setBusy(true); setErr('')
+    try {
+      const { buildAicisPrepPackPdf, download: dl } = await import('../lib/pdf')
+      const bytes = await buildAicisPrepPackPdf({
+        organisation: user?.tenant_name ?? '', registrationRef: null, periodLabel: win.label, preparedOn: fmtDate(new Date().toISOString()), sentence,
+        rows: rows.map(r => ({ name: r.common_name, identity: r.cas_number ? `CAS ${r.cas_number}` : 'not confirmed', category: categoryText(r.category, r.exemption_type),
+          volumeKg: r.period_kg, limitKg: r.volume_limit_kg, basis: r.basis ?? 'ESTIMATED', held: r.held, applicable: r.applicable, next: r.next_title })),
+        declarations: decls.map(d => ({ kind: d.kind.replace(/_/g, ' ').toLowerCase().replace(/^./, (c: string) => c.toUpperCase()), reference: d.reference, submitted: d.submitted_at ? fmtDate(d.submitted_at) : null, year: d.registration_year })),
+        requests: reqs.map(r => ({ chemical: r.chemicals?.common_name ?? '', party: r.asked_party, asked: fmtDate(r.asked_at), outcome: r.outcome })),
+        demo: (user?.tenant_name ?? '').includes('Riverside'),
+      })
+      dl(bytes, `Clariq-AICIS-prep-pack-${regYear}.pdf`)
+    } catch (e) { setErr(friendlyError(e)) }
+    setBusy(false)
+  }
+
+  return (
+    <Shell title="AICIS annual declaration prep pack" back="/chemicals" purpose="Everything you need in one place before 30 November: what was introduced, what is held, what is still to attach.">
+      <div className="flex gap-2 mb-4">
+        {(['REG', 'FY'] as const).map(p => (
+          <button key={p} type="button" onClick={() => setPeriod(p)} className={`flex-1 min-h-[48px] rounded-xl border text-sm font-medium ${period === p ? 'border-ink bg-ink text-paper' : 'border-line bg-surface'}`}>
+            {p === 'REG' ? 'Registration year' : 'Financial year'}
+          </button>
+        ))}
+      </div>
+      <p className="text-sm text-ink-soft mb-4">{win.label}</p>
+
+      <div className="grid grid-cols-2 gap-2.5 mb-5">
+        <div className="rounded-xl border border-line bg-surface px-4 py-3"><div className="font-display text-3xl font-bold text-accent">{rows.length}</div><div className="text-sm">chemicals introduced</div></div>
+        <div className="rounded-xl border border-line bg-surface px-4 py-3"><div className="font-display text-3xl font-bold text-accent">{Math.round(total)} kg</div><div className="text-sm">in the period</div></div>
+        <div className="rounded-xl border border-line bg-surface px-4 py-3"><div className="font-display text-3xl font-bold text-accent">{held}/{app}</div><div className="text-sm">records held</div></div>
+        <div className="rounded-xl border border-line bg-surface px-4 py-3"><div className="font-display text-3xl font-bold text-accent">{decls.filter(d => d.submitted_at).length}</div><div className="text-sm">declarations lodged</div></div>
+      </div>
+      <ul className="text-sm text-ink-soft mb-5 space-y-0.5">{Object.entries(byCat).map(([k, n]) => <li key={k}>{n} {k.toLowerCase()}</li>)}</ul>
+
+      <PrimaryButton disabled={busy || !rows.length} onClick={download}>{busy ? 'Building the PDF' : 'Download the prep pack (PDF)'}</PrimaryButton>
+      {err && <p role="alert" className="text-status-overdue text-sm mt-2">{err}</p>}
+
+      <h2 className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mt-6 mb-2">Chemicals</h2>
+      <ul className="divide-y divide-line">
+        {rows.map(r => (
+          <li key={r.introduction_id} className="py-2.5">
+            <Link to={`/chemicals/${r.introduction_id}`} className="flex items-center justify-between gap-3">
+              <span><span className="block font-medium">{r.common_name}</span><span className="block text-xs text-ink-soft">{categoryText(r.category, r.exemption_type)} · {r.period_kg ?? 0} kg{r.volume_limit_kg ? ` of ${r.volume_limit_kg}` : ''}</span></span>
+              <span className={`shrink-0 text-xs rounded-full text-white px-2.5 py-1 ${r.held === r.applicable ? 'bg-status-ready' : 'bg-status-overdue'}`}>{r.held}/{r.applicable}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-6 text-xs text-ink-faint">{sentence} Whether each introduction is authorised is your declaration to make.</p>
     </Shell>
   )
 }

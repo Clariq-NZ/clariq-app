@@ -23,7 +23,7 @@ type Row = {
   product_name: string | null; batch_code: string | null; hazard_classes: string[]; signal_word: string | null
   sds_version: string | null; sds_issued_date: string | null; sds_review_due: string | null
   quantity_dispatched: number | null; quantity_remaining: number | null; sighted_at: string | null; basis: string
-  last_received_at: string | null; emptied_at: string | null; sighted_location_id: string | null
+  last_received_at: string | null; emptied_at: string | null; sighted_location_id: string | null; receipt_state: string | null; site_id: string
 }
 type Term = { code: string; label: string }
 
@@ -46,7 +46,7 @@ export default function InventoryReportPage() {
 
   useEffect(() => {
     if (!customerId) { setSites([]); setSiteId(''); return }
-    gateway.listSites(customerId).then(s => { setSites(s); setSiteId(s[0]?.id ?? '') })
+    gateway.listSites(customerId).then(s => { setSites(s); setSiteId(s.length > 1 ? 'ALL' : (s[0]?.id ?? '')) })
     gateway.listCustomers().then(cs => setCustomerName(cs.find(c => c.id === customerId)?.label ?? ''))
   }, [customerId])
 
@@ -62,20 +62,24 @@ export default function InventoryReportPage() {
   useEffect(() => {
     if (!supabase || !siteId) { setRows(null); return }
     setErr(null)
-    supabase.from('v_site_inventory').select('*').eq('site_id', siteId).order('container_code').then(async ({ data, error }) => {
+    // One site, or every site for the customer (grouped by site in the list and the PDF).
+    const q = siteId === 'ALL'
+      ? supabase.from('v_site_inventory').select('*').eq('customer_id', customerId).order('container_code')
+      : supabase.from('v_site_inventory').select('*').eq('site_id', siteId).order('container_code')
+    q.then(async ({ data, error }) => {
       if (error) { setErr(friendlyError(error)); return }
       setRows((data ?? []) as Row[])
       // Where each container is, from the receipt or the last audit sighting.
       const locIds = [...new Set((data ?? []).map((r: Row) => r.sighted_location_id).filter(Boolean))] as string[]
       if (locIds.length) { const { data: ls } = await supabase!.from('locations').select('id, label').in('id', locIds); setLocationNames(Object.fromEntries((ls ?? []).map((l: any) => [l.id, l.label]))) }
       // Unaccounted: expected at this site in the most recent closed audit but never sighted.
-      const { data: sess } = await supabase!.from('audit_sessions').select('id').eq('site_id', siteId).not('closed_at', 'is', null).order('closed_at', { ascending: false }).limit(1)
+      const { data: sess } = siteId === 'ALL' ? { data: null } : await supabase!.from('audit_sessions').select('id').eq('site_id', siteId).not('closed_at', 'is', null).order('closed_at', { ascending: false }).limit(1)
       if (sess?.[0]) {
         const { data: rec } = await supabase!.from('v_audit_reconciliation').select('container_code, outcome').eq('session_id', sess[0].id)
         setUnaccounted((rec ?? []).filter((r: { outcome: string }) => r.outcome === 'UNSIGHTED').map((r: { container_code: string }) => r.container_code))
       } else setUnaccounted([])
     })
-  }, [siteId])
+  }, [siteId, customerId])
 
   const jurisdiction = rows?.[0]?.jurisdiction ?? 'NZ'
   const term = (k: string) => terms.find(t => t.code === `${jurisdiction}:${k}`)?.label ?? ''
@@ -88,12 +92,13 @@ export default function InventoryReportPage() {
     // beats audited beats as-dispatched; an unconfirmed receipt is said plainly.
     basis: r.basis === 'MEASURED_EMPTIED' ? `emptied ${fmt(r.emptied_at)}`
       : r.sighted_at ? `audited ${fmt(r.sighted_at)}`
-      : r.last_received_at ? 'as dispatched' : 'as dispatched, receipt unconfirmed',
+      : r.receipt_state === 'CONFIRMED' ? 'as dispatched' : r.receipt_state === 'ASSUMED' ? 'as dispatched, assumed received' : 'as dispatched, receipt unconfirmed',
     since: fmt(r.last_dispatch_at),
     where: r.sighted_location_id ? locationNames[r.sighted_location_id] : undefined,
-  })), [rows, hazardLabels, locationNames])
+    site: siteId === 'ALL' ? (sites.find(s => s.id === r.site_id)?.label ?? 'Site') : undefined,
+  })).sort((a, b) => (a.site ?? '').localeCompare(b.site ?? '') || a.containerCode.localeCompare(b.containerCode)), [rows, hazardLabels, locationNames, siteId, sites])
   const totalQty = view.reduce((a, r) => a + (r.quantity ?? 0), 0)
-  const siteName = sites.find(s => s.id === siteId)?.label ?? ''
+  const siteName = siteId === 'ALL' ? `All sites (${sites.length})` : (sites.find(s => s.id === siteId)?.label ?? '')
 
   const stem = () => `Clariq-inventory-${siteName.replace(/\s+/g, '-')}-${fileStamp()}`
   const exportXlsx = () => {
@@ -133,6 +138,7 @@ export default function InventoryReportPage() {
           <label className="block">
             <span className="text-xs tracking-[0.18em] text-ink-faint">SITE</span>
             <select className={inputCls} value={siteId} onChange={e => setSiteId(e.target.value)}>
+              {sites.length > 1 && <option value="ALL">All sites ({sites.length})</option>}
               {sites.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </label>
@@ -151,8 +157,9 @@ export default function InventoryReportPage() {
           </section>
 
           <ul className="divide-y divide-line">
-            {view.map(r => (
+            {view.map((r, i) => (
               <li key={r.containerCode} className="py-3">
+                {r.site && (i === 0 || view[i - 1].site !== r.site) && <div className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">{r.site}</div>}
                 <div className="flex justify-between"><span className="font-semibold">{r.containerCode}</span><span>{r.quantity ?? ''} L</span></div>
                 <div className="text-sm">{r.productName}{r.batchCode ? ` · ${r.batchCode}` : ''}{(r as any).where ? ` · ${(r as any).where}` : ''}</div>
                 <div className="text-xs text-ink-faint">{r.hazard || 'Hazard class not recorded'} · {r.basis}{r.since ? ` · on site since ${r.since}` : ''}</div>

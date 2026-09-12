@@ -30,13 +30,14 @@ export function UsersPage() {
   const { user } = useAuth()
   const endUser = isEndUserOrg(user)
   const [roles, setRoles] = useState<Role[]>([])
+  const [allRoles, setAllRoles] = useState<Role[]>([])
   const [members, setMembers] = useState<Member[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
   const [f, setF] = useState({ name: '', email: '', role: '', authorise: false })
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState('')
 
   const allowed = (code: string) => endUser ? !!ROLE_WORDS[code]?.endUser : !!ROLE_WORDS[code]?.supplier
-  const words = (code: string) => (endUser ? ROLE_WORDS[code]?.endUser : ROLE_WORDS[code]?.supplier) ?? [code, '']
+  const words = (code: string) => (endUser ? ROLE_WORDS[code]?.endUser : ROLE_WORDS[code]?.supplier) ?? [allRoles.find(r => r.code === code)?.name ?? code, '']
 
   const load = async () => {
     const [r, m, i] = await Promise.all([
@@ -44,6 +45,7 @@ export function UsersPage() {
       sb().from('app_users').select('id, display_name, email, active, can_authorise, role_id, roles(code, name)').order('display_name'),
       sb().from('user_invites').select('id, email, display_name, role_id, created_at, accepted_at, link_id').is('accepted_at', null).is('link_id', null).order('created_at', { ascending: false }),
     ])
+    setAllRoles((r.data ?? []) as Role[])
     const rs = ((r.data ?? []) as Role[]).filter(x => allowed(x.code))
     setRoles(rs); setMembers((m.data ?? []) as unknown as Member[]); setInvites((i.data ?? []) as Invite[])
     if (!f.role && rs.length) setF(p => ({ ...p, role: rs.find(x => x.code === (endUser ? 'MEMBER' : 'WAREHOUSE'))?.id ?? rs[0].id }))
@@ -114,7 +116,7 @@ export function UsersPage() {
           <ul className="space-y-2">
             {invites.map(i => (
               <li key={i.id} className="rounded-xl border border-line bg-surface px-4 py-3 flex items-center justify-between gap-3">
-                <span><span className="block font-medium">{i.display_name}</span><span className="block text-sm text-ink-soft">{i.email} · {words(roles.find(r => r.id === i.role_id)?.code ?? '')[0]}</span></span>
+                <span><span className="block font-medium">{i.display_name}</span><span className="block text-sm text-ink-soft">{i.email} · {words(allRoles.find(r => r.id === i.role_id)?.code ?? '')[0]}</span></span>
                 <button type="button" onClick={() => cancelInvite(i)} className="text-sm underline text-ink-soft">Cancel</button>
               </li>
             ))}
