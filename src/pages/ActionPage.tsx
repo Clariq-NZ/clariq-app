@@ -78,8 +78,28 @@ export default function ActionPage() {
     if (ev === 'WASHED') gateway.listReference('WASH_METHOD').then(setWashMethods)
   }, [code, ev])
 
-  useEffect(() => { if (f.customerId) gateway.listSites(f.customerId).then(setSites) }, [f.customerId])
-  useEffect(() => { if (f.productId) gateway.listBatches(f.productId).then(setBatches) }, [f.productId])
+  // Sensible defaults so the common case is confirm, not type (12 Sep):
+  // fill quantity is the container's capacity; a sole site is chosen; the
+  // first batch with stock is chosen; the last customer dispatched to on this
+  // device is preselected; the return date is today plus the usual cycle.
+  const DEFAULT_CYCLE_DAYS = 60
+  useEffect(() => {
+    if (!card) return
+    if (ev === 'FILLED') setF(p => (p.quantity_l == null ? { ...p, quantity_l: String(card.capacityLitres || '') } : p))
+    if (ev === 'DISPATCHED') setF(p => ({
+      ...p,
+      customerId: p.customerId ?? (localStorage.getItem('clariq.lastCustomer') || undefined),
+      expected_return_date: p.expected_return_date ?? new Date(Date.now() + DEFAULT_CYCLE_DAYS * 86400000).toISOString().slice(0, 10),
+    }))
+  }, [card, ev])
+  useEffect(() => {
+    if (!f.customerId) return
+    gateway.listSites(f.customerId).then(ls => { setSites(ls); if (ls.length === 1) setF(p => ({ ...p, siteId: ls[0].id })) })
+  }, [f.customerId])
+  useEffect(() => {
+    if (!f.productId) return
+    gateway.listBatches(f.productId).then(bs => { setBatches(bs); setF(p => (p.batchId ? p : { ...p, batchId: bs[0]?.id })) })
+  }, [f.productId])
 
   /** Destination status. Where an event can land in more than one place the
    * outcome is derived from the form (grade, quick-visual answers), never a
@@ -106,6 +126,7 @@ export default function ActionPage() {
           className="block min-h-[64px] rounded-2xl bg-accent text-accent-ink font-display text-xl font-bold grid place-items-center shadow-card">
           Scan the next one
         </Link>
+        {ev === 'FILLED' && <Link to={`/c/${card.code}/action/DISPATCHED`} className="block min-h-[52px] rounded-xl bg-ink text-paper grid place-items-center font-semibold">Dispatch it now</Link>}
         <Link to={`/c/${card.code}`} className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Back to {card.code}</Link>
         <Link to="/dashboard" className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Go to Today</Link>
       </nav>
@@ -173,7 +194,7 @@ export default function ActionPage() {
       payload, notes: note,
     })
     setBusy(false)
-    if (res.ok) setDone(toStatus)
+    if (res.ok) { if (ev === 'DISPATCHED' && customerId) localStorage.setItem('clariq.lastCustomer', customerId); setDone(toStatus) }
     else setError(res.error)
   }
 
@@ -198,6 +219,7 @@ export default function ActionPage() {
           className="block min-h-[64px] rounded-2xl bg-accent text-accent-ink font-display text-xl font-bold grid place-items-center shadow-card">
           Scan the next one
         </Link>
+        {ev === 'FILLED' && <Link to={`/c/${card.code}/action/DISPATCHED`} className="block min-h-[52px] rounded-xl bg-ink text-paper grid place-items-center font-semibold">Dispatch it now</Link>}
         <Link to={`/c/${card.code}`} className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Back to {card.code}</Link>
         <Link to="/dashboard" className="block min-h-[52px] rounded-xl border border-line bg-surface grid place-items-center font-semibold">Go to Today</Link>
       </nav>
@@ -206,7 +228,7 @@ export default function ActionPage() {
   )
 
   const Select = ({ k, options, placeholder }: { k: string; options: Option[]; placeholder: string }) => (
-    <select className={inputCls} value={f[k] ?? ''} onChange={e => set(k, e.target.value)}>
+    <select className={inputCls} value={f[k] ?? ''} onChange={e => { if (k === 'customerId') setF(p => ({ ...p, customerId: e.target.value, siteId: undefined })); else set(k, e.target.value) }}>
       <option value="" disabled>{placeholder}</option>
       {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
     </select>
