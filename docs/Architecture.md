@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 12 September 2026 in the decision log and sections 20 to 23
+**Version:** 0.2 (approved for build); build notes through 12 September 2026 (app v0.7.36) in the decision log and sections 20 to 24
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -873,3 +873,123 @@ Every journey walked in the code; the risky ones verified against the database a
 6. Public scan page: "I've received this" for a signed-in end user (the container card already does it after login).
 7. Daily digest extended with next-step items (30 November, identity chases).
 8. The how-to guides across user and admin journeys, after one more round of testing.
+
+---
+
+## 24. People, AICIS outputs and the implementation pathway (12 September 2026, v0.7.34 to v0.7.36)
+
+Migration 0051. Everything in this section is deployed. Version numbers follow `major.minor.commit-count` and appear in the app footer; quote them when comparing what is on screen with what is in the repo.
+
+### 24.1 Design items agreed on 12 September
+
+Eight items came out of the stress test. All are built.
+
+| # | Item | Where it landed |
+|---|---|---|
+| 1 | Dispatch and fill ask less | Quantity defaults to the container's capacity; a sole batch and a sole site are preselected; the return date defaults to 60 days; the last customer on the device is remembered; the Done screen after a fill offers "Dispatch it now" |
+| 2 | The fleet grid is a wall for a warehouse operator | Non-admin supplier roles get three tiles (with customers, needs checking, ready to go) and "See the whole fleet" behind one tap. Admin keeps the full grid |
+| 3 | Collected and returned as one action | Already possible: Return is offered directly from with-customer, so a small supplier records one event, not two |
+| 4 | Products blocked the first delivery | The delivery form accepts a product name that does not exist yet and creates it; the SDS follows later |
+| 5 | The AICIS category question is the hardest in the app | Asked once per chemical per year ("Same as last time", with Change), with a link to the Australian Inventory search and to Ask Clariq |
+| 6 | Setup steps pointed at admin pages | "Add your first site" and "Add locations" open a one-or-two-field sheet inside the checklist |
+| 7 | Nobody could add a colleague | The People screen (24.2) |
+| 8 | Nineteen menu items | Only "Every day" is open; other groups fold to a heading with a count and remember being opened for the session |
+
+### 24.2 People and roles
+
+`/admin/users`. An Admin sees everyone in the organisation, invites a colleague with a role, changes a role, deactivates someone, and cancels a pending invitation. No email is sent and no password is set: the invitee signs in with that address and `accept_user_invite()` makes them a member on first sign-in.
+
+Roles are the same table for both organisation types; which ones are offered depends on the tenant's flags. `MEMBER` was added in 0051 for end-user site staff.
+
+| Role | Offered to | View containers | Container actions | Master data | Deposits | Reports | Settings | Export | Sighting |
+|---|---|---|---|---|---|---|---|---|---|
+| ADMIN | both | all | all | yes | yes | yes | yes | yes | yes |
+| WAREHOUSE | supplier | all | create, fill, dispatch, transit, return, wash, inspect, recycling | no | no | yes | no | no | yes |
+| DRIVER | supplier | all | transit, return | no | no | yes | no | no | yes |
+| INSPECTOR | supplier | all | return, inspect | no | no | yes | no | no | yes |
+| SALES | supplier | all | none | yes | yes | yes | no | yes | yes |
+| MEMBER | end user | all they hold | received, emptied, return requested, note (through the grant) | no | no | yes | no | no | yes |
+| CUSTOMER | legacy | own only | none | no | no | own only | no | own only | yes |
+
+`can_authorise` is a separate per-user flag, offered to supplier roles only: it permits release from quarantine and retirement. Admin always has it.
+
+An end-user organisation's people are staff of their own tenant, so `isCustomerView()` is true for them (the screens read as the holder sees them) while `isEndUserOrg()` decides which home, menu and wording they get. Leaving "View as a customer" goes through `leaveCustomerView()`, which clears the flag, the lens and the `?view=customer` parameter and reloads; a plain link back to the dashboard silently re-entered customer view (fixed v0.7.36).
+
+### 24.3 Screens by organisation type
+
+| Screen | Route | Supplier | End user | Notes |
+|---|---|---|---|---|
+| Today | `/dashboard` | yes | yes | Next card, setup bar, doors, fleet tiles |
+| Scan | `/scan`, `/c/:code` | yes | yes | The end user's three one-tap actions live on the card |
+| Action forms | `/c/:code/action/:event` | yes | limited | End users reach only their permitted events |
+| Check a container | `/dashboard/queue` | yes | no | Wash and inspection queue |
+| Overdue | `/dashboard/overdue` | yes | yes | "Due back" for an end user |
+| Audit walk | `/audit` | yes | yes | Customer preselected for an end user; a sole site preselected |
+| Register | `/report/inventory` | yes | yes | All sites by default when a customer has more than one; grouped by site in the list and the PDF |
+| Customer report | `/report` | yes | yes | |
+| Reuse results | `/dashboard/circularity` | yes | yes | |
+| AICIS record | `/chemicals`, `/chemicals/:id` | if introducer | if introducer | 24.4 |
+| AICIS prep pack | `/chemicals/pack` | if introducer | if introducer | 24.4 |
+| Record a delivery | `/deliveries/new` | if introducer | if introducer | Admin only |
+| People | `/admin/users` | Admin | Admin | 24.2 |
+| Bringing Clariq into use | `/plan` | Admin | Admin | 24.5 |
+| Customers and sites | `/admin/customers` | Admin, Sales | Admin | Reads "Our sites and locations" for an end user, who cannot add customers |
+| Products | `/admin/products` | Admin, Sales | Admin | "Products we buy" for an end user |
+| Print labels | `/admin/new-containers` | Admin, Warehouse | no | |
+| Settings | `/admin/settings` | Admin | Admin | |
+| Ask Clariq | `/ask` | yes | yes | Accepts a prefilled question with `?q=` |
+| Public scan | `/public/c/:code` | anyone | anyone | Names the owning supplier, not Clariq |
+
+### 24.4 AICIS outputs
+
+The word AICIS is now visible wherever the obligation is (v0.7.36): the menu group, the page title, and the prep pack entry with its 30 November date.
+
+**AICIS record, `/chemicals`.** Every chemical imported this registration year, each with a progress ring, its volume against any limit, and one next thing. Opening one gives the completeness list by effective status, the identity editor, one-upload evidence, the third-party holder record, and the identity request that records itself and drafts the email.
+
+**Prep pack, `/chemicals/pack`.** A period switch between the registration year (1 September to 31 August, which the declaration covers) and the financial year (1 July to 30 June, which registration asks about); four figures; the category breakdown; every chemical with its ring; and a PDF. Volumes come from `chemical_batch_volumes` for the chosen window; record status follows the registration-year introduction.
+
+**Evidence pack**, from any chemical: the 20-working-day export. Every requirement that applies with its status and the document behind it, the documents on file, the deliveries, and the identity requests.
+
+Both PDFs close with the sentence from `framework_sentence()` and state that whether an introduction is authorised is the introducer's own declaration. The binding wording rule (10.6) holds: the packs never say compliant, certified or conforms.
+
+### 24.5 The implementation pathway
+
+`/plan`, "Bringing Clariq into use". Four phases for an end-user organisation, with target dates counted from the day the organisation joined, and a progress bar over the lot:
+
+| Phase | Target | What it covers |
+|---|---|---|
+| Set up | Week 1 | Sites, locations, location names in their words, invite the people who receive deliveries, products |
+| Receiving | Week 2 | Agree that scanning on arrival is the process, tell suppliers, scan the first delivery |
+| Register and audit | Month 1 | First audit walk, register for one site, register for all sites |
+| AICIS (introducers only) | By 30 November | Record each imported delivery, complete identities, attach records, prep pack in October, lodge and record the declaration |
+
+A supplier organisation gets a three-phase version (set up, first loop, customers on Clariq). Tasks the app can observe tick themselves from `setup_progress()` and the data; the rest are ticked by the admin and kept in `tenants.settings.plan_done`.
+
+### 24.6 Updates
+
+The service worker moved from silent auto-update to prompt (v0.7.35). The app checks on load and every thirty minutes; when a build is waiting, a bar offers Update or Later. Update swaps and reloads in place. Before v0.7.35, a deploy needed a manual cache clear, which is worth knowing when reading any bug report from earlier builds.
+
+### 24.7 Demo data and logins
+
+Demo is `clariq-demo.netlify.app` against the `clariq-demo` Supabase project. Seeds `demo_0004_riverside_scale.sql` and `demo_0005_riverside_scale_2.sql` (demo only, never in `supabase/migrations/`).
+
+| Who | Email | Organisation |
+|---|---|---|
+| Supplier Admin | gregf0202@gmail.com | Clariq Demo (NZ supplier) |
+| University Admin | gregf0202+uni@gmail.com, jnf1306+uni@gmail.com | Riverside University (AU end user and introducer) |
+| University site staff | gregf0202+lab@gmail.com, jnf1306+lab@gmail.com | Riverside University, MEMBER (invitations pending) |
+
+Riverside holds 291 containers across four campuses (St Lucia Chemistry, St Lucia Bio-sciences, Gatton agricultural science, Herston medical research) and 20 locations, in every receipt state, with three closed audit walks. It imports 93 chemicals across the AICIS categories, 16 with records still to attach, plus identity requests in three states and a pre-introduction report on file. That is the demonstration set: audit walk through to AICIS declaration preparation, on one record.
+
+### 24.8 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-12 | MEMBER role for end-user site staff | A university's technicians need scan, receive, empty and audit, and nothing else |
+| 2026-09-12 | Invitations are records, not emails | No password, no mail dependency: the address is the invitation |
+| 2026-09-12 | Nobody creates an introduction; a delivery creates it | The obligation is real, the wall was our choice |
+| 2026-09-12 | AICIS named in the menu, the title and the pack | An administrator has to recognise the app is doing the thing they were dreading |
+| 2026-09-12 | Registration year and financial year both offered on the prep pack | The declaration covers one, registration asks about the other |
+| 2026-09-12 | Implementation pathway in the app, not a document | A plan nobody opens is not a plan; ticks the app can see should tick themselves |
+| 2026-09-12 | Service worker prompts rather than updating silently | A deploy should not need a cache clear |
+| 2026-09-12 | Version quoted from the footer in every discussion | Matching what is on screen to what is in the repo |
