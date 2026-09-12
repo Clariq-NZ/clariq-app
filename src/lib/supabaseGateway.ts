@@ -43,7 +43,9 @@ function makeLive(sb: SupabaseClient): Gateway {
       const { data, error } = await sb
         .from('containers')
         .select(`id, code, status, fill_count, return_count, completed_cycle_count,
-                 expected_return_at, condition_grade, updated_at,
+                 expected_return_at, condition_grade, updated_at, tenant_id,
+                 last_received_at, last_emptied_at, last_dispatch_at, quantity_on_hand, current_site_id,
+                 tenants:tenant_id ( name ),
                  container_types ( code, capacity_litres, compatible_product_groups ),
                  customers:current_customer_id ( trading_name, legal_name ),
                  sites:current_site_id ( name ),
@@ -66,6 +68,9 @@ function makeLive(sb: SupabaseClient): Gateway {
         completedCycles: d.completed_cycle_count,
         expectedReturnAt: d.expected_return_at ?? undefined,
         lastEventAt: d.updated_at, conditionGrade: d.condition_grade ?? undefined,
+        ownerTenantId: d.tenant_id, ownerName: d.tenants?.name ?? undefined, siteId: d.current_site_id ?? undefined,
+        lastReceivedAt: d.last_received_at ?? undefined, lastEmptiedAt: d.last_emptied_at ?? undefined,
+        lastDispatchAt: d.last_dispatch_at ?? undefined, quantityOnHand: d.quantity_on_hand ?? undefined,
       }
     },
     async getFillHistory(containerId): Promise<FillRecord[]> {
@@ -292,9 +297,11 @@ function makeLive(sb: SupabaseClient): Gateway {
     },
     async submitEvent(e: SubmitEvent) {
       try {
-      const { data: me } = await sb.from('app_users').select('tenant_id').eq('id', (await sb.auth.getUser()).data.user?.id ?? '').maybeSingle()
+      // Events belong to the container's owner, never the actor's organisation
+      // (Architecture 21.3): a linked end user writes into the supplier's record.
+      const { data: owner } = await sb.from('containers').select('tenant_id').eq('id', e.containerId).maybeSingle()
       const { error } = await sb.from('container_events').insert({
-        tenant_id: (me as any)?.tenant_id,
+        tenant_id: (owner as any)?.tenant_id,
         container_id: e.containerId,
         event_type: e.eventType,
         to_status: e.toStatus,
@@ -303,6 +310,7 @@ function makeLive(sb: SupabaseClient): Gateway {
         product_id: e.productId ?? null,
         batch_id: e.batchId ?? null,
         order_ref: e.orderRef ?? null,
+        location_id: e.locationId ?? null,
         payload: e.payload,
         notes: e.notes ?? null,
       })

@@ -16,7 +16,7 @@ const INK = rgb(0.13, 0.145, 0.165)
 const SOFT = rgb(0.29, 0.31, 0.34)
 const FAINT = rgb(0.54, 0.56, 0.60)
 
-export async function buildLabelSheetPdf(ids: string[], opts: { sample?: boolean } = {}) {
+export async function buildLabelSheetPdf(ids: string[], opts: { sample?: boolean; supplierName?: string } = {}) {
   const { sample = false } = opts
   const PAGE = { w: spec.page.w * MM, h: spec.page.h * MM }
   const LABEL = { w: spec.label.w * MM, h: spec.label.h * MM }
@@ -64,7 +64,8 @@ export async function buildLabelSheetPdf(ids: string[], opts: { sample?: boolean
     spaced('CONTAINER ID', reg, 5.8, y0 + 31 * MM, 1.3)
     spaced(id, bold, 16.5, y0 + 24 * MM, 0.9)
 
-    const pl = 'Return this container to Clariq'
+    // The supplier's own name (copy rule 11 Sep). Clariq Operations prints Clariq.
+    const pl = `Return this container to ${opts.supplierName ?? 'Clariq'}`
     const plW = reg.widthOfTextAtSize(pl, 7.5)
     page.drawText(pl, { x: x0 + LABEL.w / 2 - plW / 2, y: y0 + pad * 0.8, size: 7.5, font: reg, color: INK })
 

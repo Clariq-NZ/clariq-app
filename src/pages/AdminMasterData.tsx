@@ -93,7 +93,14 @@ export function CustomerDetailPage() {
     const { error } = await sb().from('sites').insert({ tenant_id: t, customer_id: id, name: site.name, region: site.region || null, address: { line1: site.address } })
     if (!error) { setSite({ name: '', region: '', address: '' }); setAdding(false); void load() }
   }
-  const saveLabels = async (next: LocationLabels) => { setLabels(next); await sb().from('customers').update({ location_labels: next }).eq('id', id!) }
+  const [labelErr, setLabelErr] = useState('')
+  // Through set_location_labels(): the linked organisation may name its own
+  // locations even though the customer record belongs to the supplier.
+  const saveLabels = async (next: LocationLabels) => {
+    setLabels(next); setLabelErr('')
+    const { error } = await sb().rpc('set_location_labels', { p_customer: id!, p_labels: next })
+    if (error) setLabelErr(friendlyError(error))
+  }
   const applyPreset = (k: string) => saveLabels({ preset: k, ...PRESETS[k], name: undefined } as any)
   if (!c || !labels) return null
   return (
@@ -109,6 +116,7 @@ export function CustomerDetailPage() {
         <div className="grid grid-cols-2 gap-2">
           {LEVELS.map(l => <input key={l} className={inputCls} value={labels[l]} onChange={e => setLabels({ ...labels, [l]: e.target.value })} onBlur={() => saveLabels(labels)} aria-label={`Level ${LEVELS.indexOf(l) + 1}`} />)}
         </div>
+        {labelErr && <p role="alert" className="text-status-overdue text-sm mt-2">{labelErr}</p>}
       </details>
       <h2 className="font-semibold mb-2">Sites</h2>
       <ul className="space-y-2 mb-3">
@@ -231,7 +239,7 @@ export function ProductsPage() {
     if (!error) { setF({ name: '', product_group: '', manufacturer: '', concentration: '', sds_url: '' }); void load() }
   }
   return (
-    <Shell title="Products" back="/menu" purpose="The chemicals Clariq supplies or expects to find." help="customer-setup">
+    <Shell title="Products" back="/menu" purpose="What you supply, or expect to find on site." help="customer-setup">
       <ul className="space-y-1.5 mb-5">
         {rows.map(p => <li key={p.id} className="rounded border border-line bg-surface px-4 py-2.5"><span className="font-medium">{p.name}</span><span className="block text-sm text-ink-soft">{p.code}{p.product_group ? ` · ${p.product_group}` : ''}{p.manufacturer ? ` · ${p.manufacturer}` : ''}</span></li>)}
       </ul>

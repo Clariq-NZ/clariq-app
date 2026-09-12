@@ -74,7 +74,7 @@ export default function LoginPage() {
             {busy ? 'Sending link' : 'Email me a sign-in link'}
           </button>
           <div className="border-t border-line pt-4 text-sm text-ink-soft space-y-1">
-            <p>Access is set up by Clariq for its customers and staff.</p>
+            <p>Access is set up by your organisation's administrator, or by the supplier who invited you.</p>
             <p>Questions or new access: <a href="mailto:info@clariq.nz" className="underline text-ink">info@clariq.nz</a></p>
           </div>
         </form>

@@ -8,6 +8,7 @@ import { CustomerBanner, CustomerPicker, useCustomerFilter, useCustomerLens, wit
 import { BrandBar, AppFooter } from '../components/Brand'
 import { BigButton, Door, PageHead } from '../components/ui'
 import { FirstRun, hasSeenFirstRun } from '../components/FirstRun'
+import { NextStepCard, SetupProgress } from '../components/NextStep'
 
 /** Screen 1 - Today (Architecture 13). Overdue first, then fleet by status.
  * Every tile is a filter; every number can be tapped through to the
@@ -107,6 +108,10 @@ export default function DashboardPage() {
         </div>
       ) : <div className="mb-5"><CustomerPicker /></div>}
 
+      {/* What should I do now: one computed card, then the setup bar while it lasts. */}
+      {gateway.mode !== 'demo' && <NextStepCard customerId={customerId} />}
+      {gateway.mode !== 'demo' && <SetupProgress />}
+
       <section aria-label="Start here" className="mb-6">
         <HomeDoors role={role} customerView={customerView} customerId={customerId} endUser={endUser} />
       </section>
@@ -134,11 +139,22 @@ export default function DashboardPage() {
           {/* Fleet by status */}
           <section aria-label="Fleet by status">
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Fleet</h2>
-              <span className="text-sm text-ink-soft tabular-nums">{d.fleetTotal} containers</span>
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">{endUser ? 'Our containers' : 'Fleet'}</h2>
+              <span className="text-sm text-ink-soft tabular-nums">{endUser ? `${(d.byStatus.WITH_CUSTOMER ?? 0) + (d.byStatus.RETURN_REQUESTED ?? 0) + (d.byStatus.IN_TRANSIT ?? 0)} with you` : `${d.fleetTotal} containers`}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {TILE_ORDER.map(s => {
+              {/* An end user's world is what is with them; everything else is
+                  back with the supplier and shown as one tile. */}
+              {endUser && (() => {
+                const back = TILE_ORDER.filter(s => !['WITH_CUSTOMER','RETURN_REQUESTED','IN_TRANSIT'].includes(s)).reduce((n, s) => n + (d.byStatus[s] ?? 0), 0)
+                return back > 0 ? (
+                  <div className="rounded-xl border border-line bg-surface border-l-4 border-l-status-eol px-4 py-3 shadow-card">
+                    <div className="font-display text-3xl font-bold tabular-nums text-accent">{back}</div>
+                    <div className="mt-0.5 text-base font-medium text-ink leading-snug">Back with your supplier</div>
+                  </div>
+                ) : null
+              })()}
+              {TILE_ORDER.filter(s => !endUser || ['WITH_CUSTOMER','RETURN_REQUESTED','IN_TRANSIT'].includes(s)).map(s => {
                 const count = d.byStatus[s] ?? 0
                 if (!count) return null
                 const meta = STATUS_META[s]
@@ -153,7 +169,7 @@ export default function DashboardPage() {
               })}
               {d.fleetTotal === 0 && (
                 <p className="col-span-full text-ink-soft py-6 text-center">
-                  {customerView ? 'No containers with you yet. When Clariq delivers one, it appears here.' : 'No containers yet. Print labels to create the first ones.'}
+                  {customerView ? 'No containers with you yet. When your supplier delivers one, it appears here.' : 'No containers yet. Print labels to create the first ones.'}
                 </p>
               )}
             </div>

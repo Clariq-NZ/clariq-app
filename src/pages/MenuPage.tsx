@@ -65,6 +65,13 @@ export default function MenuPage() {
           <Item to="/admin/settings" label="Settings" sub="Region motif" />
         </Group>
       )}
+      {user?.introducer && (
+        <Group title="CHEMICALS WE IMPORT">
+          <Item to="/deliveries/new" label="Record a delivery" sub="Four questions; the AICIS record builds itself" />
+          <Item to="/chemicals" label="Chemicals we import" sub="What is held for each, and the next thing to do" />
+          {admin && endUser && <Item to="/admin/products" label="Products we buy" sub="What arrives, with its safety data sheet" />}
+        </Group>
+      )}
       <Group title="HELP">
         <Item to="/guide" label="Show me how" sub="Each task, step by step" />
         <Item to="/ask" label="Ask Clariq" sub="How do I, or what does the law say" />

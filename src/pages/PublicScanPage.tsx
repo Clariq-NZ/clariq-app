@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
+import { supabase } from '../lib/supabase'
 
 /**
  * Public container page - Architecture section 7.
@@ -11,10 +13,22 @@ import { BrandBar, AppFooter } from '../components/Brand'
  * page renders from the route param alone, which is honest: the public page
  * shows nothing that needs a database.
  */
+type Owner = { owner_name: string | null; contact_email: string | null; return_instructions: string | null }
+
 export default function PublicScanPage() {
   const { code } = useParams()
   const id = (code ?? '').toUpperCase()
   const valid = /^CLQ-\d{6}$/.test(id)
+  // Who owns the container (Architecture 21, copy rule 11 Sep): the label
+  // says "return to <supplier>", never to Clariq the platform. Name and
+  // contact only; nothing about the contents.
+  const [owner, setOwner] = useState<Owner | null>(null)
+  useEffect(() => {
+    if (!supabase || !valid) return
+    supabase.rpc('public_container_lookup', { p_code: id }).then(({ data }) => setOwner((data as Owner[])?.[0] ?? null))
+  }, [id, valid])
+  const who = owner?.owner_name ?? 'the supplier named on the label'
+  const email = owner?.contact_email ?? 'info@clariq.nz'
 
   return (
     <main className="min-h-dvh flex flex-col px-5 pb-6">
@@ -43,14 +57,13 @@ export default function PublicScanPage() {
 
       <section className="max-w-sm text-center space-y-4">
         <h1 className="font-display text-lg font-semibold">
-          Return this container to Clariq
+          Return this container to {who}
         </h1>
         <p className="text-ink-soft leading-relaxed">
-          Please return it so it can be washed, inspected and used again.
-          {/* return_instructions from tenant settings replaces this line at deploy */}
+          {owner?.return_instructions ?? 'Please return it so it can be washed, inspected and used again.'}
         </p>
         <p className="text-ink-soft leading-relaxed">
-          Questions? Email <a href="mailto:info@clariq.nz" className="underline text-ink">info@clariq.nz</a> and quote the container number above.
+          Questions? Email <a href={`mailto:${email}`} className="underline text-ink">{email}</a> and quote the container number above.
         </p>
       </section>
 

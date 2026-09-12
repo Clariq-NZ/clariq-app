@@ -9,11 +9,13 @@ import { buildCustomerReportPdf, buildLabelSheetPdf, download } from '../lib/pdf
 import { ExportBar, Field, inputCls, PageHead, PrimaryButton } from '../components/ui'
 import { DemoBadge } from './DashboardPage'
 import { BrandBar, AppFooter } from '../components/Brand'
+import { useAuth } from '../lib/auth'
 
 /** Stage 2/6 screens that run against the gateway, so they work in demo mode
  * today and against Supabase unchanged. */
 
 export function CreateContainersPage() {
+  const { user } = useAuth()
   const [typeCode, setTypeCode] = useState('TYPE-5L-HDPE-01')
   const [count, setCount] = useState('8')
   const [supplier, setSupplier] = useState('')
@@ -30,7 +32,7 @@ export function CreateContainersPage() {
 
   async function labels() {
     if (!created) return
-    const bytes = await buildLabelSheetPdf(created, { sample: gateway.mode === 'demo' })
+    const bytes = await buildLabelSheetPdf(created, { sample: gateway.mode === 'demo', supplierName: user?.tenant_name || undefined })
     download(bytes, `clariq-labels-${created[0]}-${created[created.length - 1]}.pdf`)
   }
 

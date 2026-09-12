@@ -26,7 +26,8 @@ export default function AskPage() {
   const container = params.get('container') ?? undefined
   const product = params.get('product') ?? undefined
   const [jurisdiction, setJurisdiction] = useState<Jurisdiction>((params.get('jurisdiction') as Jurisdiction) || 'NZ')
-  const [question, setQuestion] = useState('')
+  // A link may arrive with the question written (?q=), e.g. from the delivery form.
+  const [question, setQuestion] = useState(params.get('q') ?? '')
   const [turns, setTurns] = useState<Turn[]>([])
   const [busy, setBusy] = useState(false)
   const answerRefs = useRef<(HTMLElement | null)[]>([])

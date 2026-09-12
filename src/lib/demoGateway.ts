@@ -48,6 +48,7 @@ const TRANSITIONS: T[] = [
 ]
 
 const ACTION_LABELS: Record<EventType, string> = {
+  RECEIVED: 'Arrived on site', EMPTIED: 'Empty, ready to go back',
   INITIAL_INSPECTION: 'Initial inspection',
   FILLED: 'Fill',
   DISPATCHED: 'Dispatch',

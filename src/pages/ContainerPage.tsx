@@ -6,6 +6,8 @@ import { StatusChip } from '../components/ui'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { fmtDate } from '../lib/dates'
 import { useCustomerLens } from '../lib/customerFilter'
+import { useAuth, isEndUserOrg } from '../lib/auth'
+import { EndUserActions, ReceiptLine } from '../components/EndUserActions'
 
 /** The scan result: one card, one list of actions (Architecture 14, "Tone").
  * Actions come from the same transition table the database enforces, so this
@@ -18,7 +20,10 @@ export default function ContainerPage() {
   // container that is not theirs (the database returns nothing) falls through
   // to the public page (Architecture 7).
   const { customerView, isCustomerUser } = useCustomerLens()
+  const { user } = useAuth()
+  const endUser = isEndUserOrg(user)
   const [card, setCard] = useState<ContainerCard | null | 'loading'>('loading')
+  const [reloads, setReloads] = useState(0)
   const [actions, setActions] = useState<ActionDef[]>([])
   const [fills, setFills] = useState<FillRecord[]>([])
 
@@ -36,7 +41,7 @@ export default function ContainerPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [code])
+  }, [code, reloads])
 
   if (card === 'loading') return <Shell><p className="text-ink-faint">Loading…</p></Shell>
 
@@ -77,14 +82,17 @@ export default function ContainerPage() {
           </div>
         )}
 
+        {endUser && <ReceiptLine card={card} />}
+
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[15px]">
           {card.customerName && !customerView && <Item k="Customer" v={card.customerName} />}
+          {endUser && card.ownerName && <Item k="Supplied by" v={card.ownerName} />}
           {card.siteName && <Item k="Site" v={card.siteName} />}
           {card.batchCode && <Item k="Batch" v={card.batchCode} />}
           {card.expectedReturnAt && !overdue && <Item k="Expected return" v={fmtDate(card.expectedReturnAt)} />}
-          {card.conditionGrade && <Item k="Condition" v={`Grade ${card.conditionGrade}`} />}
-          <Item k="Cycles completed" v={String(card.completedCycles)} />
-          <Item k="Fills / returns" v={`${card.fillCount} / ${card.returnCount}`} />
+          {card.conditionGrade && !endUser && <Item k="Condition" v={`Grade ${card.conditionGrade}`} />}
+          {!endUser && <Item k="Cycles completed" v={String(card.completedCycles)} />}
+          {!endUser && <Item k="Fills / returns" v={`${card.fillCount} / ${card.returnCount}`} />}
         </dl>
       </section>
 
@@ -114,8 +122,9 @@ export default function ContainerPage() {
         </section>
       )}
 
-      {/* The actions: staff only. A customer can request a collection later
-          (Architecture 7, Phase 2); until then their card is read-only. */}
+      {/* End-user organisations get their three scan-driven actions
+          (Architecture 21.4); supplier staff get the full transition list. */}
+      {endUser && <EndUserActions card={card} onDone={() => setReloads(n => n + 1)} />}
       {!customerView && <section className="mt-6 space-y-2.5">
         {actions.map(a => (
           <button key={a.eventType}

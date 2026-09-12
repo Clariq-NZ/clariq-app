@@ -16,6 +16,7 @@ import AskPage from './pages/AskPage'
 import InventoryReportPage from './pages/InventoryReportPage'
 import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
 import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
+import { ChemicalsPage, ChemicalDetailPage, DeliveryPage } from './pages/ChemicalsPages'
 import { AuthProvider, RequireAccount, RequireStaff, RequireSignedIn } from './lib/auth'
 import { inMemoryDemo } from './lib/env'
 import { DemoBanner } from './components/DemoBanner'
@@ -72,6 +73,9 @@ const router = createBrowserRouter([{ element: <Root />, children: [
   { path: '/audit/:session', element: staff(<AuditSessionPage />) },
   { path: '/audit/:session/sight/:code', element: staff(<SightingPage />) },
   { path: '/audit/:session/result', element: staff(<AuditResultPage />) },
+  { path: '/chemicals', element: staff(<ChemicalsPage />) },
+  { path: '/chemicals/:id', element: staff(<ChemicalDetailPage />) },
+  { path: '/deliveries/new', element: staff(<DeliveryPage />) },
   { path: '/scan', element: staff(<ScanPage />) },
   { path: '/c/:code', element: <ScanLanding /> },
   { path: '/c/:code/action/:event', element: staff(<ActionPage />) },

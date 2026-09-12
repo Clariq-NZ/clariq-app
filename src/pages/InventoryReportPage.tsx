@@ -22,7 +22,7 @@ type Row = {
   product_name: string | null; batch_code: string | null; hazard_classes: string[]; signal_word: string | null
   sds_version: string | null; sds_issued_date: string | null; sds_review_due: string | null
   quantity_dispatched: number | null; quantity_remaining: number | null; sighted_at: string | null; basis: string
-  last_received_at: string | null; emptied_at: string | null
+  last_received_at: string | null; emptied_at: string | null; sighted_location_id: string | null
 }
 type Term = { code: string; label: string }
 
@@ -37,6 +37,7 @@ export default function InventoryReportPage() {
   const [hazardLabels, setHazardLabels] = useState<Record<string, string>>({})
   const [customerName, setCustomerName] = useState('')
   const [unaccounted, setUnaccounted] = useState<string[]>([])
+  const [locationNames, setLocationNames] = useState<Record<string, string>>({})
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
 
@@ -61,6 +62,9 @@ export default function InventoryReportPage() {
     supabase.from('v_site_inventory').select('*').eq('site_id', siteId).order('container_code').then(async ({ data, error }) => {
       if (error) { setErr(friendlyError(error)); return }
       setRows((data ?? []) as Row[])
+      // Where each container is, from the receipt or the last audit sighting.
+      const locIds = [...new Set((data ?? []).map((r: Row) => r.sighted_location_id).filter(Boolean))] as string[]
+      if (locIds.length) { const { data: ls } = await supabase!.from('locations').select('id, label').in('id', locIds); setLocationNames(Object.fromEntries((ls ?? []).map((l: any) => [l.id, l.label]))) }
       // Unaccounted: expected at this site in the most recent closed audit but never sighted.
       const { data: sess } = await supabase!.from('audit_sessions').select('id').eq('site_id', siteId).not('closed_at', 'is', null).order('closed_at', { ascending: false }).limit(1)
       if (sess?.[0]) {
@@ -83,7 +87,8 @@ export default function InventoryReportPage() {
       : r.sighted_at ? `audited ${fmt(r.sighted_at)}`
       : r.last_received_at ? 'as dispatched' : 'as dispatched, receipt unconfirmed',
     since: fmt(r.last_dispatch_at),
-  })), [rows, hazardLabels])
+    where: r.sighted_location_id ? locationNames[r.sighted_location_id] : undefined,
+  })), [rows, hazardLabels, locationNames])
   const totalQty = view.reduce((a, r) => a + (r.quantity ?? 0), 0)
   const siteName = sites.find(s => s.id === siteId)?.label ?? ''
 
@@ -146,11 +151,11 @@ export default function InventoryReportPage() {
             {view.map(r => (
               <li key={r.containerCode} className="py-3">
                 <div className="flex justify-between"><span className="font-semibold">{r.containerCode}</span><span>{r.quantity ?? ''} L</span></div>
-                <div className="text-sm">{r.productName}{r.batchCode ? ` · ${r.batchCode}` : ''}</div>
+                <div className="text-sm">{r.productName}{r.batchCode ? ` · ${r.batchCode}` : ''}{(r as any).where ? ` · ${(r as any).where}` : ''}</div>
                 <div className="text-xs text-ink-faint">{r.hazard || 'Hazard class not recorded'} · {r.basis}{r.since ? ` · on site since ${r.since}` : ''}</div>
               </li>
             ))}
-            {view.length === 0 && <li className="py-3 text-ink-soft">No Clariq containers recorded on this site.</li>}
+            {view.length === 0 && <li className="py-3 text-ink-soft">No supplier containers recorded on this site.</li>}
           </ul>
 
           <div className="mt-6"><ExportBar onPdf={exportPdf} onXlsx={exportXlsx} busy={busy} disabled={view.length === 0} /></div>

@@ -24,6 +24,14 @@ export interface ContainerCard {
   expectedReturnAt?: string
   lastEventAt?: string
   conditionGrade?: string
+  /** Party fields (Architecture 21). Absent in the in-memory demo. */
+  ownerTenantId?: string
+  ownerName?: string
+  siteId?: string
+  lastReceivedAt?: string
+  lastEmptiedAt?: string
+  lastDispatchAt?: string
+  quantityOnHand?: number
 }
 
 export interface Option { id: string; label: string; sub?: string; group?: string }
@@ -44,7 +52,7 @@ export interface FillRecord {
 }
 
 export type EventType =
-  | 'INITIAL_INSPECTION' | 'FILLED' | 'DISPATCHED' | 'DELIVERED' | 'RETURN_REQUESTED'
+  | 'INITIAL_INSPECTION' | 'FILLED' | 'DISPATCHED' | 'DELIVERED' | 'RECEIVED' | 'EMPTIED' | 'RETURN_REQUESTED'
   | 'COLLECTED' | 'RETURNED' | 'WASHED' | 'INSPECTED' | 'QUARANTINED'
   | 'RELEASED' | 'MARKED_LOST' | 'FOUND' | 'RETIRED'
   | 'SENT_FOR_RECYCLING' | 'RECYCLED' | 'VOIDED' | 'NOTE'
@@ -65,6 +73,7 @@ export interface SubmitEvent {
   productId?: string
   batchId?: string
   orderRef?: string
+  locationId?: string
   payload: Record<string, unknown>
   notes?: string
 }

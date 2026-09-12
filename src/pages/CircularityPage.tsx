@@ -21,11 +21,11 @@ const kg = (g: number) => (g / 1000).toFixed(1) + ' kg'
 export function CircularityPage() {
   const [customerId] = useCustomerFilter()
   const [d, setD] = useState<Dashboard | null>(null)
-  const [scope, setScope] = useState('Clariq fleet')
+  const [scope, setScope] = useState('Whole fleet')
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
   useEffect(() => {
-    if (!customerId) { setScope('Clariq fleet'); return }
+    if (!customerId) { setScope('Whole fleet'); return }
     gateway.listCustomers().then(cs => setScope(cs.find(x => x.id === customerId)?.label ?? 'Customer'))
   }, [customerId])
   if (!d) return null
@@ -175,7 +175,7 @@ export function OverduePage() {
     <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Back to={withCustomer('/dashboard', customerId)} label="Today" />
       <PageHead title={customerView ? 'What is due back' : 'What is overdue for return'}
-        purpose={customerView ? 'Containers due back to Clariq soon or already past their date.' : 'Containers that should have come back by now, longest outstanding first.'} help="overdue" />
+        purpose={customerView ? 'Containers due back to your supplier soon or already past their date.' : 'Containers that should have come back by now, longest outstanding first.'} help="overdue" />
       <div className="mb-4"><CustomerPicker /></div>
       <ul className="space-y-2">
         {d.overdue.map(o => (
