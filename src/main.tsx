@@ -19,6 +19,7 @@ import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from '
 import { ChemicalsPage, ChemicalDetailPage, DeliveryPage, AicisPackPage } from './pages/ChemicalsPages'
 import { UsersPage } from './pages/UsersPage'
 import { PlanPage } from './pages/PlanPage'
+import { UpdatePrompt } from './components/UpdatePrompt'
 import { AuthProvider, RequireAccount, RequireStaff, RequireSignedIn } from './lib/auth'
 import { inMemoryDemo } from './lib/env'
 import { DemoBanner } from './components/DemoBanner'
@@ -106,6 +107,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
       <RouterProvider router={router} />
+      <UpdatePrompt />
     </AuthProvider>
   </React.StrictMode>,
 )

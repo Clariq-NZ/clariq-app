@@ -22,7 +22,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': the app shows "A new version is ready" and updates on tap,
+      // instead of silently running old code until the next full reload.
+      registerType: 'prompt',
       manifest: {
         name: 'Clariq Containers',
         short_name: 'Clariq',
