@@ -83,6 +83,7 @@ export default function DashboardPage() {
   // A real customer user is always in customer view; an Admin is in it after "View as".
   const customerView = viewParam || lens.customerView
   const endUser = isEndUserOrg(user)
+  const [showWholeFleet, setShowWholeFleet] = useState(false)
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
 
   const overdueOnly = d?.overdue.filter(o => o.flag !== 'DUE_SOON') ?? []
@@ -154,7 +155,23 @@ export default function DashboardPage() {
                   </div>
                 ) : null
               })()}
-              {TILE_ORDER.filter(s => !endUser || ['WITH_CUSTOMER','RETURN_REQUESTED','IN_TRANSIT'].includes(s)).map(s => {
+              {/* Non-admin supplier roles (design item 2): three tiles that
+                  match their day, and the full grid behind one tap. */}
+              {!endUser && role !== 'ADMIN' && !customerView && !showWholeFleet && (() => {
+                const sum = (ss: string[]) => ss.reduce((n, k) => n + (d.byStatus[k as ContainerStatus] ?? 0), 0)
+                const tiles = [
+                  { label: 'With customers', n: sum(['WITH_CUSTOMER','RETURN_REQUESTED','IN_TRANSIT']), to: '/dashboard/status/WITH_CUSTOMER', tone: 'border-l-status-out' },
+                  { label: 'Needs checking', n: sum(['AWAITING_WASH','AWAITING_INSPECTION','QUARANTINED']), to: '/dashboard/queue', tone: 'border-l-status-processing' },
+                  { label: 'Ready to go', n: sum(['IN_STOCK','FILLED']), to: '/dashboard/status/IN_STOCK', tone: 'border-l-status-ready' },
+                ]
+                return tiles.map(t => (
+                  <Link key={t.label} to={t.to} className={`rounded-xl border border-line bg-surface border-l-4 ${t.tone} px-4 py-3 shadow-card active:bg-paper`}>
+                    <div className="font-display text-3xl font-bold tabular-nums text-accent">{t.n}</div>
+                    <div className="mt-0.5 text-base font-medium text-ink leading-snug">{t.label}</div>
+                  </Link>
+                ))
+              })()}
+              {(endUser || role === 'ADMIN' || customerView || showWholeFleet) && TILE_ORDER.filter(s => !endUser || ['WITH_CUSTOMER','RETURN_REQUESTED','IN_TRANSIT'].includes(s)).map(s => {
                 const count = d.byStatus[s] ?? 0
                 if (!count) return null
                 const meta = STATUS_META[s]
@@ -173,6 +190,11 @@ export default function DashboardPage() {
                 </p>
               )}
             </div>
+            {!endUser && role !== 'ADMIN' && !customerView && (
+              <button type="button" onClick={() => setShowWholeFleet(v => !v)} className="mt-3 text-sm underline text-ink-soft">
+                {showWholeFleet ? 'Back to the short view' : 'See the whole fleet'}
+              </button>
+            )}
           </section>
         </>
       )}

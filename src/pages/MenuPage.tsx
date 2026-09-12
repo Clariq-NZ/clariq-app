@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { useAuth, isCustomerView, setCustomerView, isEndUserOrg } from '../lib/auth'
@@ -7,6 +8,25 @@ import { useNavigate } from 'react-router-dom'
 
 /** The menu: one list, grouped by what a person is there to do. Admin-only
  * entries are hidden rather than disabled. */
+// Design item 8 (12 Sep): only Every day is open by default; the rest fold
+// to a heading and remember whether the person opened them this session.
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  const key = 'clariq.menu.' + title
+  const [open, setOpen] = useState(title === 'EVERY DAY' || sessionStorage.getItem(key) === '1')
+  const toggle = () => { const n = !open; setOpen(n); sessionStorage.setItem(key, n ? '1' : '0') }
+  const count = Array.isArray(children) ? children.filter(Boolean).length : children ? 1 : 0
+  return (
+    <section className="mb-4">
+      <button type="button" onClick={toggle} aria-expanded={open}
+        className="w-full flex items-center justify-between text-left min-h-[44px] py-1">
+        <h2 className="text-xs tracking-[0.18em] text-ink-faint">{title}</h2>
+        <span className="text-xs text-ink-faint">{open ? 'Hide' : `${count} item${count === 1 ? '' : 's'}`}</span>
+      </button>
+      {open && <div className="space-y-2 mt-1">{children}</div>}
+    </section>
+  )
+}
+
 export default function MenuPage() {
   const { user, signOut } = useAuth()
   const nav = useNavigate()
@@ -24,12 +44,6 @@ export default function MenuPage() {
       <span className="block font-medium">{label}</span>
       {sub && <span className="block text-sm text-ink-soft">{sub}</span>}
     </Link>
-  )
-  const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <section className="mb-6">
-      <h2 className="text-xs tracking-[0.18em] text-ink-faint mb-2">{title}</h2>
-      <div className="space-y-2">{children}</div>
-    </section>
   )
   return (
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
@@ -56,18 +70,20 @@ export default function MenuPage() {
           <Item to="/admin/customers" label="Customers and their sites" />
           <Item to="/admin/products" label="Products" />
           <Item to="/admin/new-containers" label="Print new labels" />
+          <Item to="/admin/users" label="People" sub="Who can sign in, and what each person can do" />
           <Item to="/admin/settings" label="Settings" sub="Region motif, overdue thresholds" />
         </Group>
       )}
       {admin && endUser && (
         <Group title="SET UP">
           <Item to={myCustomer ? `/admin/customers/${myCustomer}` : '/admin/customers'} label="Our sites and locations" sub="Where containers are kept: campus, building, room, cabinet" />
+          <Item to="/admin/users" label="People" sub="Who can sign in, and what each person can do" />
           <Item to="/admin/settings" label="Settings" sub="Region motif" />
         </Group>
       )}
       {user?.introducer && (
         <Group title="CHEMICALS WE IMPORT">
-          <Item to="/deliveries/new" label="Record a delivery" sub="Four questions; the AICIS record builds itself" />
+          {admin && <Item to="/deliveries/new" label="Record a delivery" sub="Four questions; the AICIS record builds itself" />}
           <Item to="/chemicals" label="Chemicals we import" sub="What is held for each, and the next thing to do" />
           {admin && endUser && <Item to="/admin/products" label="Products we buy" sub="What arrives, with its safety data sheet" />}
         </Group>

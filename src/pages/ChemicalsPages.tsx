@@ -35,7 +35,7 @@ const categoryText = (c: string, s: string | null) => CATEGORY_WORDS[c] + (s && 
 
 /** How the person chooses a category at delivery: plain question, five answers. */
 const CATEGORY_CHOICES: { code: string; category: string; subtype: string | null; label: string; hint: string }[] = [
-  { code: 'LISTED', category: 'LISTED', subtype: null, label: 'It is on the Australian Inventory', hint: 'Most common. The supplier can confirm; an Inventory search will show it.' },
+  { code: 'LISTED', category: 'LISTED', subtype: null, label: 'It is on the Australian Inventory', hint: 'Most common. The supplier can confirm, or search the Inventory by CAS number.' },
   { code: 'EX_RD', category: 'EXEMPTED', subtype: 'RESEARCH_AND_DEVELOPMENT', label: 'Research only, small quantity, not on the Inventory', hint: 'Exempted. Typically under 10 kg a year in a lab.' },
   { code: 'RP_RD', category: 'REPORTED', subtype: 'RESEARCH_AND_DEVELOPMENT', label: 'Research only, we lodged a pre-introduction report', hint: 'Reported. You have a report reference from AICIS.' },
   { code: 'RP_10', category: 'REPORTED', subtype: 'TEN_KG_OR_LESS', label: '10 kg or less this year, we lodged a pre-introduction report', hint: 'Reported.' },
@@ -295,6 +295,9 @@ export function DeliveryPage() {
   const { user } = useAuth()
   const [products, setProducts] = useState<{ id: string; name: string }[]>([])
   const [f, setF] = useState({ product: '', quantity: '', unit: 'KG', supplier: '', lot: '', received: new Date().toISOString().slice(0, 10), imported: !!user?.introducer, choice: 'LISTED' })
+  // Design item 4: nobody visits Products before their first delivery. A
+  // name typed here creates the product; the SDS can be added later.
+  const [newProduct, setNewProduct] = useState('')
   const [preview, setPreview] = useState<Preview[]>([])
   // Asked once per chemical: if this year's introduction already exists for
   // the product's chemicals, the category is shown as "same as last time".
@@ -328,10 +331,17 @@ export function DeliveryPage() {
   const choice = CATEGORY_CHOICES.find(c => c.code === f.choice)!
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('')
+    let productId = f.product
+    if (!productId && newProduct.trim()) {
+      const { data: p, error } = await sb().from('products').insert({ tenant_id: user!.tenant_id, name: newProduct.trim() }).select('id').single()
+      if (error) { setErr(friendlyError(error)); setBusy(false); return }
+      productId = p.id
+    }
+    if (!productId) { setErr('Choose a product or type its name.'); setBusy(false); return }
     let doc: string | null = null
     if (file) { const up = await uploadEvidence(file, 'SHIPPING_DOCUMENT'); if ('error' in up) { setErr(up.error); setBusy(false); return } doc = up.id }
     const { data, error } = await sb().rpc('record_delivery', {
-      p_product: f.product, p_quantity: Number(f.quantity), p_unit: f.unit, p_supplier: f.supplier, p_supplier_lot: f.lot || null,
+      p_product: productId, p_quantity: Number(f.quantity), p_unit: f.unit, p_supplier: f.supplier, p_supplier_lot: f.lot || null,
       p_received: f.received, p_imported: f.imported, p_category: f.imported ? choice.category : null, p_exemption_type: f.imported ? choice.subtype : null,
       p_shipping_document: doc,
     })
@@ -346,14 +356,15 @@ export function DeliveryPage() {
     <Shell title="Record a delivery" back={user?.introducer ? '/chemicals' : '/menu'} purpose="Four questions. If it came from overseas, the AICIS record starts from this.">
       <form onSubmit={submit} className="space-y-4">
         <Field label="What arrived">
-          <select className={inputCls} required value={f.product} onChange={e => setF({ ...f, product: e.target.value })}>
+          <select className={inputCls} required={!newProduct.trim()} value={f.product} onChange={e => setF({ ...f, product: e.target.value })}>
             <option value="">Choose a product</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        {products.length === 0 && (
-          <p className="text-sm rounded-xl border border-accent bg-accent/10 px-4 py-3">No products yet. <Link to="/admin/products" className="underline font-medium">Add the product first</Link>, then come back here. It takes a minute.</p>
+        {!f.product && (
+          <Field label={products.length ? 'Or a product not in the list yet' : 'What is it called? (first delivery, no products yet)'}>
+            <input className={inputCls} value={newProduct} onChange={e => setNewProduct(e.target.value)} placeholder="As it reads on the label" />
+          </Field>
         )}
-        {products.length > 0 && <p className="text-xs text-ink-soft -mt-2">Not in the list? <Link to="/admin/products" className="underline">Add a product</Link>.</p>}
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2"><Field label="How much"><input className={inputCls} required inputMode="decimal" value={f.quantity} onChange={e => setF({ ...f, quantity: e.target.value })} /></Field></div>
           <Field label="Unit"><select className={inputCls} value={f.unit} onChange={e => setF({ ...f, unit: e.target.value })}><option>KG</option><option>G</option><option>L</option><option>ML</option></select></Field>
@@ -386,7 +397,7 @@ export function DeliveryPage() {
                 </label>
               ))}
             </div>
-            <p className="text-xs text-ink-soft mt-3">Not sure? <Link to="/ask?q=How%20do%20I%20categorise%20an%20imported%20chemical%20under%20AICIS&jurisdiction=AU" className="underline">Ask Clariq</Link> walks through the categorisation steps. You can change this later.</p>
+            <p className="text-xs text-ink-soft mt-3">Not sure? <a href="https://www.industrialchemicals.gov.au/search-inventory" target="_blank" rel="noreferrer" className="underline">Search the Australian Inventory</a> by CAS number, or <Link to="/ask?q=How%20do%20I%20categorise%20an%20imported%20chemical%20under%20AICIS&jurisdiction=AU" className="underline">Ask Clariq</Link>. You can change this later.</p>
           </fieldset>
         )}
         {crossed.length > 0 && (

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { withCustomer } from '../lib/customerFilter'
+import { useAuth } from '../lib/auth'
+import { addLocation } from '../lib/audit'
+import { friendlyError } from '../lib/errors'
 
 /** The "what should I do now" layer (Architecture 21.11, decision 11 Sep).
  *
@@ -50,12 +53,17 @@ export function NextStepCard({ customerId = '' }: { customerId?: string }) {
 }
 
 export function SetupProgress() {
+  const { user } = useAuth()
   const [setup, setSetup] = useState<Setup | null>(null)
   const [open, setOpen] = useState(false)
+  const [reload, setReload] = useState(0)
   useEffect(() => {
     if (!supabase) return
     supabase.rpc('setup_progress').then(({ data }) => setSetup(data as Setup))
-  }, [])
+  }, [reload])
+  // Design item 6: the first site and first locations are one field each,
+  // done right here. The admin pages remain for editing later.
+  const inlineFor = (code: string) => (code === 'sites' || code === 'locations') && !!user?.linked_customer_ids[0]
   if (!setup || setup.total === 0 || setup.done === setup.total) return null
   const pct = Math.round((setup.done / setup.total) * 100)
   return (
@@ -78,6 +86,8 @@ export function SetupProgress() {
                 <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-ink-soft">
                   <Tick /> <span className="line-through">{st.label}</span>
                 </div>
+              ) : inlineFor(st.code) ? (
+                <InlineStep code={st.code} label={st.label} customerId={user!.linked_customer_ids[0]} tenantId={user!.tenant_id} onDone={() => setReload(n => n + 1)} />
               ) : (
                 <Link to={st.to} className="flex items-center gap-3 rounded-lg border border-line px-3 py-2 min-h-[48px] active:bg-paper">
                   <span aria-hidden className="w-5 h-5 rounded-full border-2 border-status-processing shrink-0" />
@@ -92,6 +102,48 @@ export function SetupProgress() {
         </ol>
       )}
     </section>
+  )
+}
+
+function InlineStep({ code, label, customerId, tenantId, onDone }: { code: string; label: string; customerId: string; tenantId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [a, setA] = useState(''); const [b, setB] = useState('')
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const save = async () => {
+    if (!supabase) return
+    setBusy(true); setErr('')
+    try {
+      if (code === 'sites') {
+        const { error } = await supabase.from('sites').insert({ tenant_id: tenantId, customer_id: customerId, name: a.trim(), region: b.trim() || null, address: {} })
+        if (error) throw error
+      } else {
+        const { data: site } = await supabase.from('sites').select('id').eq('customer_id', customerId).eq('active', true).order('name').limit(1).maybeSingle()
+        if (!site) throw new Error('Add a site first')
+        await addLocation({ site_id: site.id, building: a.trim(), room: b.trim() || undefined })
+      }
+      setOpen(false); setA(''); setB(''); onDone()
+    } catch (e) { setErr(friendlyError(e)) }
+    setBusy(false)
+  }
+  if (!open) return (
+    <button type="button" onClick={() => setOpen(true)} className="w-full flex items-center gap-3 rounded-lg border border-line px-3 py-2 min-h-[48px] text-left active:bg-paper">
+      <span aria-hidden className="w-5 h-5 rounded-full border-2 border-status-processing shrink-0" />
+      <span className="font-medium">{label}</span>
+    </button>
+  )
+  const first = code === 'sites' ? 'Site name (campus, depot, plant)' : 'Building'
+  const second = code === 'sites' ? 'State or region (optional)' : 'Room (optional)'
+  return (
+    <div className="rounded-lg border border-accent bg-accent/10 px-3 py-3 space-y-2">
+      <div className="font-medium">{label}</div>
+      <input className="w-full rounded border border-line bg-paper px-3 py-2.5 min-h-[44px]" placeholder={first} value={a} onChange={e => setA(e.target.value)} aria-label={first} />
+      <input className="w-full rounded border border-line bg-paper px-3 py-2.5 min-h-[44px]" placeholder={second} value={b} onChange={e => setB(e.target.value)} aria-label={second} />
+      {err && <p role="alert" className="text-status-overdue text-sm">{err}</p>}
+      <div className="flex gap-3">
+        <button type="button" onClick={save} disabled={busy || !a.trim()} className="rounded bg-ink text-paper px-4 py-2 font-semibold disabled:opacity-50">{busy ? 'Saving' : 'Save'}</button>
+        <button type="button" onClick={() => setOpen(false)} className="underline text-ink-soft px-2">Cancel</button>
+      </div>
+    </div>
   )
 }
 
