@@ -5,6 +5,7 @@ import { buildInventoryXlsx } from '../lib/xlsx'
 import { CustomerPicker, useCustomerFilter } from '../lib/customerFilter'
 import { gateway } from '../lib/supabaseGateway'
 import { supabase } from '../lib/supabase'
+import { useAuth, isEndUserOrg } from '../lib/auth'
 import { friendlyError } from '../lib/errors'
 import { buildInventoryReportPdf, download, type InventoryRow } from '../lib/pdf'
 import type { Option } from '../lib/gateway'
@@ -38,6 +39,8 @@ export default function InventoryReportPage() {
   const [customerName, setCustomerName] = useState('')
   const [unaccounted, setUnaccounted] = useState<string[]>([])
   const [locationNames, setLocationNames] = useState<Record<string, string>>({})
+  const { user } = useAuth()
+  const endUser = isEndUserOrg(user)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
 
@@ -122,7 +125,7 @@ export default function InventoryReportPage() {
   return (
     <main className="min-h-dvh px-5 pb-10 max-w-md mx-auto">
       <BrandBar back="/menu" />
-      <PageHead title="Chemicals on site" purpose={`What is at a location right now, in the form of the ${term('INVENTORY').toLowerCase() || 'site inventory'}, ready for the customer's own register.`} help="reports" />
+      <PageHead title={endUser ? 'Chemicals on our sites' : 'Chemicals on site'} purpose={`What is at a location right now, in the form of the ${term('INVENTORY').toLowerCase() || 'site inventory'}, ready for ${endUser ? 'your own register' : "the customer's own register"}.`} help="reports" />
 
       <div className="space-y-3 mb-5">
         <CustomerPicker />

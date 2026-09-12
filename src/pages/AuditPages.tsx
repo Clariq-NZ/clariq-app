@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { Field, inputCls, PrimaryButton, PageHead } from '../components/ui'
 import { supabase } from '../lib/supabase'
+import { useAuth, isEndUserOrg } from '../lib/auth'
 import * as A from '../lib/audit'
 import { attachPhoto } from '../lib/media'
 import { LEVELS, labelsFor } from '../lib/locationLabels'
@@ -33,6 +34,10 @@ const CONDITIONS = [
 export function AuditHomePage() {
   const nav = useNavigate()
   const [open, setOpen] = useState<any[]>([])
+  const { user } = useAuth()
+  // An end-user organisation is its own customer: no question to ask, and a
+  // sole site is chosen for them (ease of use, 12 Sep).
+  const endUser = isEndUserOrg(user)
   const [customers, setCustomers] = useState<any[]>([])
   const [sites, setSites] = useState<any[]>([])
   const [cust, setCust] = useState(''); const [site, setSite] = useState(''); const [expected, setExpected] = useState('')
@@ -42,7 +47,11 @@ export function AuditHomePage() {
     A.listSessions(true).then(setOpen)
     sb().from('customers').select('id, trading_name, legal_name').is('archived_at', null).order('trading_name').then(r => setCustomers(r.data ?? []))
   }, [])
-  useEffect(() => { if (cust) sb().from('sites').select('id, name').eq('customer_id', cust).eq('active', true).then(r => setSites(r.data ?? [])); else setSites([]) }, [cust])
+  useEffect(() => { if (endUser && user?.linked_customer_ids[0] && !cust) setCust(user.linked_customer_ids[0]) }, [endUser, user, cust])
+  useEffect(() => {
+    if (cust) sb().from('sites').select('id, name').eq('customer_id', cust).eq('active', true).then(r => { const ls = r.data ?? []; setSites(ls); if (ls.length === 1) setSite(ls[0].id) })
+    else setSites([])
+  }, [cust])
   if (!supabase) return <Shell title="Audit" back="/menu"><p>Audit needs the live app, not demo mode.</p></Shell>
   const start = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,11 +73,11 @@ export function AuditHomePage() {
       )}
       <h2 className="text-xs tracking-[0.18em] text-ink-faint mb-2">START A WALK</h2>
       <form onSubmit={start} className="space-y-3 rounded border border-line p-4 bg-surface">
-        <Field label="Customer">
+        {!endUser && <Field label="Customer">
           <select className={inputCls} required value={cust} onChange={e => { setCust(e.target.value); setSite('') }}>
             <option value="">Choose</option>{customers.map(c => <option key={c.id} value={c.id}>{c.trading_name || c.legal_name}</option>)}
           </select>
-        </Field>
+        </Field>}
         <Field label="Site">
           <select className={inputCls} required value={site} onChange={e => setSite(e.target.value)} disabled={!cust}>
             <option value="">Choose</option>{sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -77,7 +86,7 @@ export function AuditHomePage() {
         <Field label="Containers expected (optional)"><input className={inputCls} inputMode="numeric" value={expected} onChange={e => setExpected(e.target.value)} /></Field>
         {err && <p role="alert" className="text-status-overdue text-sm">{err}</p>}
         <PrimaryButton disabled={!site}>Start</PrimaryButton>
-        <p className="text-xs text-ink-faint">No customer or site yet? Add them under Menu, Customers.</p>
+        <p className="text-xs text-ink-faint">{endUser ? 'No site yet? Add one under Menu, Our sites and locations.' : 'No customer or site yet? Add them under Menu, Customers.'}</p>
       </form>
     </Shell>
   )

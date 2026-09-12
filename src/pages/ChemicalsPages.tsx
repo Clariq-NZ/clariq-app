@@ -236,7 +236,7 @@ export function ChemicalDetailPage() {
             <li key={r.requirement_code} className="rounded-xl border border-line bg-surface px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-medium leading-snug">{r.title}{r.requirement_group && <span className="ml-2 text-xs text-ink-faint">any one of {r.requirement_group === 'ABC' ? 'A, B or C' : 'this group'}</span>}</div>
+                  <div className="font-medium leading-snug">{r.title}{r.requirement_group && rows.filter(x => x.requirement_group === r.requirement_group).length > 1 && <span className="ml-2 text-xs text-ink-faint">any one of {r.requirement_group === 'ABC' ? 'A, B or C' : 'these'}</span>}</div>
                   {outstanding && req?.description && <div className="text-sm text-ink-soft mt-0.5">{req.description}</div>}
                   {r.held_from_record && <div className="text-xs text-ink-soft mt-1">From the chemical record: CAS number and name are on file</div>}
                   {r.kind !== 'EVIDENCE' && <div className="text-xs text-ink-faint mt-0.5">{r.kind === 'SYSTEM' ? 'Kept by Clariq automatically' : 'Produced from your records'}</div>}
@@ -281,7 +281,7 @@ function IdentityEditor({ chemicalId, cas, onSaved }: { chemicalId: string; cas:
   return (
     <div className="grid grid-cols-2 gap-2">
       <Field label="CAS number"><input className={inputCls} value={f.cas_number} onChange={e => setF({ ...f, cas_number: e.target.value })} placeholder="75-05-8" /></Field>
-      <Field label="CAS name"><input className={inputCls} value={f.cas_name} onChange={e => setF({ ...f, cas_name: e.target.value })} placeholder="Acetonitrile" /></Field>
+      <Field label="CAS name"><input className={inputCls} value={f.cas_name} onChange={e => setF({ ...f, cas_name: e.target.value })} placeholder="Name from the SDS, section 3" /></Field>
       <div className="col-span-2"><PrimaryButton disabled={busy || !f.cas_number || !f.cas_name} onClick={save}>{busy ? 'Saving' : 'Save identity'}</PrimaryButton></div>
       {err && <p role="alert" className="col-span-2 text-status-overdue text-sm">{err}</p>}
     </div>
@@ -296,6 +296,22 @@ export function DeliveryPage() {
   const [products, setProducts] = useState<{ id: string; name: string }[]>([])
   const [f, setF] = useState({ product: '', quantity: '', unit: 'KG', supplier: '', lot: '', received: new Date().toISOString().slice(0, 10), imported: !!user?.introducer, choice: 'LISTED' })
   const [preview, setPreview] = useState<Preview[]>([])
+  // Asked once per chemical: if this year's introduction already exists for
+  // the product's chemicals, the category is shown as "same as last time".
+  const [known, setKnown] = useState<{ category: string; exemption_type: string | null; name: string } | null>(null)
+  const [changeIt, setChangeIt] = useState(false)
+  useEffect(() => {
+    setKnown(null); setChangeIt(false)
+    if (!f.product) return
+    const year = new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1
+    sb().from('product_chemicals').select('chemical_id').eq('product_id', f.product).then(async ({ data }) => {
+      const ids = (data ?? []).map((x: any) => x.chemical_id)
+      if (!ids.length) return
+      const { data: s } = await sb().from('v_chemical_summary').select('category, exemption_type, common_name').in('chemical_id', ids).eq('registration_year', year).limit(1)
+      const k = s?.[0]
+      if (k) { setKnown({ category: k.category, exemption_type: k.exemption_type, name: k.common_name }); const c = CATEGORY_CHOICES.find(c => c.category === k.category && (c.subtype ?? null) === (k.exemption_type ?? null)); if (c) setF(prev => ({ ...prev, choice: c.code })) }
+    })
+  }, [f.product])
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   useEffect(() => {
@@ -353,7 +369,13 @@ export function DeliveryPage() {
             <span><span className="block font-medium">Imported from overseas by us</span><span className="block text-sm text-ink-soft">Bought from an Australian supplier? Leave this off.</span></span>
           </label>
         )}
-        {f.imported && (
+        {f.imported && known && !changeIt && (
+          <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm">
+            <span className="font-medium">Same as last time:</span> {categoryText(known.category, known.exemption_type)}.{' '}
+            <button type="button" onClick={() => setChangeIt(true)} className="underline text-ink-soft">Change</button>
+          </div>
+        )}
+        {f.imported && (!known || changeIt) && (
           <fieldset className="rounded-xl border border-line bg-surface p-4">
             <legend className="px-1 font-medium">How does AICIS see this chemical?</legend>
             <div className="space-y-2 mt-2">

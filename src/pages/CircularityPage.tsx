@@ -119,7 +119,7 @@ export function StatusListPage() {
     <main className="min-h-dvh px-5 pb-28 max-w-2xl mx-auto">
       <Back to={withCustomer('/dashboard', customerId)} label="Today" />
       <div className="flex items-start justify-between gap-3">
-        <PageHead title={s ? statusLabel(s, customerView) : ''} purpose={STATUS_PURPOSE[s] ?? 'Every container in this state. Tap one to open it.'} help="scan" />
+        <PageHead title={s ? statusLabel(s, customerView) : ''} purpose={customerView && s === 'WITH_CUSTOMER' ? 'At your site. Tap one to see what is in it and when it is due back.' : STATUS_PURPOSE[s] ?? 'Every container in this state. Tap one to open it.'} help="scan" />
         <div className="pt-6"><StatusChip status={s} customerView={customerView} /></div>
       </div>
       <div className="mb-4"><CustomerPicker /></div>

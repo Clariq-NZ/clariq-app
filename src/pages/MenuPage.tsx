@@ -47,9 +47,9 @@ export default function MenuPage() {
       </Group>
       <Group title="REPORTS">
         <Item to="/dashboard/circularity" label="Reuse results" sub="How many times containers went round, and what that saved" />
-        <Item to="/report" label={cv ? 'My report' : 'Report for a customer'} sub="Any period, PDF or spreadsheet, by location" />
-        <Item to="/report/inventory" label={cv ? 'Chemicals on my site' : 'Chemicals on site'} sub="What is at a location right now" />
-        {admin && <Item to="/admin/view-as" label="See what a customer sees" />}
+        <Item to="/report" label={endUser ? 'Our report' : cv ? 'My report' : 'Report for a customer'} sub="Any period, PDF or spreadsheet, by location" />
+        <Item to="/report/inventory" label={endUser ? 'Chemicals on our sites' : cv ? 'Chemicals on my site' : 'Chemicals on site'} sub="What is at a location right now" />
+        {admin && !endUser && <Item to="/admin/view-as" label="See what a customer sees" />}
       </Group>
       {admin && !endUser && (
         <Group title="SET UP">
