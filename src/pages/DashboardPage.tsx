@@ -7,7 +7,7 @@ import { useAuth, setCustomerView, isEndUserOrg } from '../lib/auth'
 import { CustomerBanner, CustomerPicker, useCustomerFilter, useCustomerLens, withCustomer } from '../lib/customerFilter'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { BigButton, Door, PageHead } from '../components/ui'
-import { FirstRun, hasSeenFirstRun } from '../components/FirstRun'
+import { FirstRun, shouldShowFirstRun } from '../components/FirstRun'
 import { NextStepCard, SetupProgress } from '../components/NextStep'
 
 /** Screen 1 - Today (Architecture 13). Overdue first, then fleet by status.
@@ -31,13 +31,18 @@ const GROUP_BORDER: Record<string, string> = {
  * Menu. Labels are Clariq's words, signed off 30 Aug. */
 function HomeDoors({ role, customerView, customerId, endUser }: { role: string; customerView: boolean; customerId: string; endUser?: boolean }) {
   const overdue = withCustomer('/dashboard/overdue', customerId)
+  // Both of the end user's first two doors land on the register. The big
+  // button opens it chemical first; "Our containers" opens the same screen
+  // site first (decision 2026-09-13). One query, one tree, two entry points.
+  const onSite = withCustomer('/report/inventory', customerId)
+  const onSiteBySite = onSite + (onSite.includes('?') ? '&' : '?') + 'group=site'
   // An end-user organisation's home (Architecture 21.9 item 3): what is on
   // site, what is due back, and the audit walk. The report lives in Menu.
   if (endUser) return (
     <>
-      <BigButton to={withCustomer('/report/inventory', customerId)}>Chemicals on our sites</BigButton>
+      <BigButton to={onSite}>Chemicals on our sites</BigButton>
       <div className="grid grid-cols-3 gap-2.5 mt-2.5">
-        <Door to={withCustomer('/dashboard/status/WITH_CUSTOMER', customerId)}>Our containers</Door>
+        <Door to={onSiteBySite}>Our containers</Door>
         <Door to={overdue}>What is due back</Door>
         <Door to="/audit">Do an audit walk</Door>
       </div>
@@ -73,7 +78,6 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const role = user?.role_code ?? 'ADMIN'
   const [tour, setTour] = useState(false)
-  useEffect(() => { setTour(!hasSeenFirstRun(role)) }, [role])
   const [customerId] = useCustomerFilter()
   const [d, setD] = useState<Dashboard | null>(null)
   const [sp] = useSearchParams()
@@ -83,6 +87,14 @@ export default function DashboardPage() {
   // A real customer user is always in customer view; an Admin is in it after "View as".
   const customerView = viewParam || lens.customerView
   const endUser = isEndUserOrg(user)
+  // The gate and the cards read the same role: the tour a person was shown as
+  // a customer is not the tour they need as a warehouse operator.
+  const tourRole = customerView ? 'CUSTOMER' : role
+  useEffect(() => {
+    let live = true
+    void shouldShowFirstRun(tourRole).then(v => { if (live) setTour(v) })
+    return () => { live = false }
+  }, [tourRole])
   const [showWholeFleet, setShowWholeFleet] = useState(false)
   useEffect(() => { gateway.getDashboard(customerId || undefined).then(setD) }, [customerId])
 
@@ -96,7 +108,7 @@ export default function DashboardPage() {
       <PageHead title={customerView ? 'Home' : 'Today'}
         purpose={endUser ? 'What is on your sites, what is due back, and the audit walk.' : customerView ? 'Your containers, what is due back, and your report.' : 'What needs doing this morning, then the fleet at a glance.'}
         help={customerView ? 'scan' : 'overdue'} />
-      {tour && <FirstRun role={customerView ? 'CUSTOMER' : role} onDone={() => setTour(false)} />}
+      {tour && <FirstRun role={tourRole} onDone={() => setTour(false)} />}
 
       {customerView ? (
         <div className="mb-5 space-y-3">

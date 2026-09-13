@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 12 September 2026 (app v0.7.36) in the decision log and sections 20 to 24
+**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.37) in the decision log and sections 20 to 25
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -695,7 +695,7 @@ No blank lists. Each says what would fill it and offers the one action that woul
 
 ### 21.6 First-run cards
 
-Three cards, once per role per device (`localStorage`), replayable from Menu ("Show me around"). The customer version says: scan any Clariq container to see what is in it.
+Three cards, replayable from Menu ("Show me around"). The customer version says: scan any Clariq container to see what is in it. **Superseded by 25.1 on 13 September 2026:** the state moved from the device to `user_first_run`, capped at three appearances per person per role.
 
 ### 21.7 Ask Clariq answers "how do I"
 
@@ -993,3 +993,70 @@ Riverside holds 291 containers across four campuses (St Lucia Chemistry, St Luci
 | 2026-09-12 | Implementation pathway in the app, not a document | A plan nobody opens is not a plan; ticks the app can see should tick themselves |
 | 2026-09-12 | Service worker prompts rather than updating silently | A deploy should not need a cache clear |
 | 2026-09-12 | Version quoted from the footer in every discussion | Matching what is on screen to what is in the repo |
+
+---
+
+## 25. The welcome cards and the rolled-up register (13 September 2026, v0.7.37)
+
+Migrations 0052 and 0053. Two refinements, both raised from use of the demo on a phone.
+
+### 25.1 The welcome cards follow the person
+
+21.6 held the three first-run cards in `localStorage`, which is per browser profile per origin. A new phone, a cache clear, a second browser and an iOS home-screen install each started the tour again, and an organisation change looked like a new person. Installing the PWA to the home screen does not fix this and on iOS makes it worse, because the installed app gets a fresh storage container.
+
+`user_first_run` (0052) holds `shown_count` and `completed_at` per person per role, with row-level security limiting each person to their own row. The device copy remains as a fast path so the modal never flashes while the server answers, and it holds the line if the server is unreachable. Three rules go with it:
+
+- at most three appearances per person per role, ever;
+- it counts as done only when the person finished the cards or tapped Skip, so closing the app on card one no longer costs them the tour;
+- it never opens on someone who arrived at `/c/:code`, `/scan` or a public page, because they are standing at a pallet with a phone. The tour waits for Home.
+
+The gate and the cards now read the same effective role (`CUSTOMER` in customer view, otherwise the role code); previously the gate was keyed on the raw role and the cards on the effective one. "Show me around" in Menu clears both copies and awaits the server before navigating.
+
+### 25.2 The register rolls up before it lists
+
+A flat list of 238 containers answers "which containers" when the question is "how much of what, and where". `/report/inventory` now opens on a four-level tree: chemical, then site, then container size, then the containers themselves. Each level expands in place; a container row opens the container card. The full listing is still there behind "Show every container", and it is what the PDF and XLSX carry in full.
+
+The top two levels swap with one control, because an EHS officer thinks site first and a procurement or AICIS administrator thinks chemical first. Both of the end user's first two home doors land here: "Chemicals on our sites" chemical first, "Our containers" (`?group=site`) site first. `/dashboard/status/WITH_CUSTOMER` remains the staff status list.
+
+Three rules hold the figures honest:
+
+| Rule | Why |
+|---|---|
+| Quantities are what is on hand, never nominal capacity | A part-used 50 L container is not 50 L on site, and an empty one is nothing. Nominal capacity means nothing to a site holding empties |
+| Every total carries its receipt split (confirmed, assumed, unconfirmed) rather than blending them | The register never pretends (23). A rolled-up number that hides an unconfirmed receipt is worse than a flat list |
+| Empties and the customer's own stock get their own lines and stay out of the supplier totals | An empty container is on site and needs collecting, but it is not volume. Stock recorded on an audit walk is not supplier-supplied and must not read as a supplier figure |
+
+"Chemical" at the top level is the **product**, which is measured and needs no assumption. Rolling product volume up under a substance heading needs the concentration from `product_chemicals` and produces an estimate; that is a separate lens, carrying the estimated badge of 10.5, and is not built.
+
+`buildRollup()` in `src/lib/rollup.ts` produces the tree; the screen, the PDF summary section and the XLSX Summary sheet all draw from it, so the three cannot disagree (the rule from 30 August). 0053 appends `ownership` to `v_site_inventory` so supplier containers and the customer's own stock can be separated; the column set is otherwise untouched.
+
+### 25.3 PDF tables stopped running off the page
+
+Reported from the AICIS prep pack on 13 September. Two tables had column budgets wider than the A4 text width of 178 mm:
+
+| Table | Last column | Ended at | Overrun |
+|---|---|---|---|
+| Prep pack, Chemicals | Next | 194 mm | 16 mm past the margin |
+| Inventory report, Listing | Basis / where | 192 mm | 14 mm past the margin |
+
+Both are rebudgeted to end at 178 mm exactly. The evidence pack's two tables were already inside the margin.
+
+The second half of the fault was the truncation model. Cells were cut with an ellipsis at a fixed width, so a reader saw "Reported to AICIS before intr…" and "Solely for R&D, not available …", which is the part of the row they needed. `wrapCell()` in `src/lib/pdf.ts` now wraps a cell inside its column to at most three lines and grows the row to fit; a single word wider than the column is broken rather than allowed to run past it, and the ellipsis survives only as a last resort on the third line. Continuation lines are set in the soft grey so the first line still reads as the value.
+
+In development the table helper warns when any column budget ends past the text width, so a widened column cannot silently go off the page again.
+
+### 25.4 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-13 | First-run state per person per role on the server, device copy as a fast path | localStorage is per browser profile; a new phone or an iOS install restarted the tour |
+| 2026-09-13 | Three appearances maximum, done only on finish or Skip | Once is the intent; the cap is the backstop, and an accidental swipe should not cost the tour |
+| 2026-09-13 | No tour for someone who arrived at a container, the scanner or a public page | They are mid-task with a phone in a shed |
+| 2026-09-13 | Register opens rolled up: chemical, site, size, container | 238 rows is not an answer to "how much of what, and where" |
+| 2026-09-13 | Top two levels swap; both end-user doors land on the same screen | Site first and chemical first are two readers of one dataset, not two screens |
+| 2026-09-13 | Rolled-up quantities are on hand, never nominal capacity | Nominal is meaningless once a site holds empties |
+| 2026-09-13 | Receipt split shown at every level, never blended | Consistent with the register's own honesty rule |
+| 2026-09-13 | Empties and non-supplier stock on their own lines, outside supplier totals | On site is not the same as supplied, and neither is volume |
+| 2026-09-13 | Top level is the product, not the substance | Product volume is measured; substance quantity needs concentration and is an estimate |
+| 2026-09-13 | PDF table cells wrap inside their column instead of being cut with an ellipsis | The truncated end of a row was the part the reader needed |
+| 2026-09-13 | Column budgets asserted against the 178 mm text width, with a development warning | Two tables had drifted past the right margin and nothing caught it |

@@ -1,7 +1,9 @@
 import * as XLSX from 'xlsx'
 import type { CustomerReport, Dashboard } from './gateway'
-import type { InventoryRow } from './pdf'
+import type { InventoryRow, RollupExport } from './pdf'
 import { fmtDate } from './dates'
+
+type RollupLine = RollupExport['supplied'][number]
 
 /** XLSX exports. Every report exports the same sections it shows on screen
  * and in its PDF, one sheet per section, plus the raw rows the figures were
@@ -99,8 +101,29 @@ export function buildCircularityXlsx(d: Dashboard, scopeLabel: string, demo = fa
   return new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellDates: true }))
 }
 
-export function buildInventoryXlsx(r: { customerName: string; siteName: string; schemeTerm: string; rows: InventoryRow[]; unaccounted: string[]; demo?: boolean }): Uint8Array {
+export function buildInventoryXlsx(r: { customerName: string; siteName: string; schemeTerm: string; rows: InventoryRow[]; unaccounted: string[]; rollup?: RollupExport; demo?: boolean }): Uint8Array {
   const wb = XLSX.utils.book_new()
+  // Summary first: the same tree the screen shows, indented by level, so the
+  // reader meets the totals before the container-by-container listing.
+  if (r.rollup) {
+    const lines = (ls: RollupLine[]) => ls.map(l => [
+      '    '.repeat(l.level) + l.label, l.litres, l.containers, l.empties || null, l.basis || '',
+    ] as Cell[])
+    sheet(wb, 'Summary', [
+      ['Chemicals on site, summary'],
+      ['Customer', r.customerName],
+      ['Location', r.siteName],
+      ['Grouped by', r.rollup.groupLabel],
+      ['Prepared', today()],
+      ...(r.demo ? [['DEMONSTRATION DATA']] : []),
+      [],
+      ['Quantities are what is on hand. Emptied containers are counted separately and carry no volume.'],
+      [],
+      ['Supplier containers', 'Litres', 'Containers', 'Empty', 'Receipt basis'],
+      ...lines(r.rollup.supplied),
+      ...(r.rollup.own.length ? [[], ['Customer\'s own containers (recorded on an audit walk)', 'Litres', 'Containers', 'Empty', 'Receipt basis'], ...lines(r.rollup.own)] : []),
+    ], [44, 10, 12, 8, 34])
+  }
   sheet(wb, 'Inventory', [
     ['Chemical inventory'],
     ['Customer', r.customerName],

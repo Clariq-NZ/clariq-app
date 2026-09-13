@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { ExportBar, inputCls, PageHead } from '../components/ui'
 import { buildInventoryXlsx } from '../lib/xlsx'
@@ -10,6 +11,8 @@ import { friendlyError } from '../lib/errors'
 import { buildInventoryReportPdf, download, type InventoryRow } from '../lib/pdf'
 import type { Option } from '../lib/gateway'
 import { fmtDate, fileStamp } from '../lib/dates'
+import { InventoryRollup } from '../components/InventoryRollup'
+import { buildRollup, rollupLines, type Grouping, type RollupRow } from '../lib/rollup'
 
 /** Customer Chemical Inventory Report (Architecture 0.3, section 13.1).
  * One site at a time. Rows come from v_site_inventory: as-dispatched by
@@ -24,6 +27,7 @@ type Row = {
   sds_version: string | null; sds_issued_date: string | null; sds_review_due: string | null
   quantity_dispatched: number | null; quantity_remaining: number | null; sighted_at: string | null; basis: string
   last_received_at: string | null; emptied_at: string | null; sighted_location_id: string | null; receipt_state: string | null; site_id: string
+  ownership: 'SUPPLIER' | 'CUSTOMER' | 'THIRD_PARTY' | null
 }
 type Term = { code: string; label: string }
 
@@ -31,6 +35,12 @@ const fmt = (d: string | null) => fmtDate(d)
 
 export default function InventoryReportPage() {
   const [customerId] = useCustomerFilter()
+  // Both home doors land here: "Chemicals on our sites" chemical first,
+  // "Our containers" site first. Same query, same tree, different top level.
+  const [sp, setSp] = useSearchParams()
+  const group: Grouping = sp.get('group') === 'site' ? 'site' : 'product'
+  const setGroup = (g: Grouping) => { const n = new URLSearchParams(sp); n.set('group', g); setSp(n, { replace: true }) }
+  const [showEvery, setShowEvery] = useState(false)
   const [sites, setSites] = useState<Option[]>([])
   const [siteId, setSiteId] = useState('')
   const [rows, setRows] = useState<Row[] | null>(null)
@@ -84,20 +94,47 @@ export default function InventoryReportPage() {
   const jurisdiction = rows?.[0]?.jurisdiction ?? 'NZ'
   const term = (k: string) => terms.find(t => t.code === `${jurisdiction}:${k}`)?.label ?? ''
   const hazardText = (r: Row) => (r.hazard_classes ?? []).map(c => hazardLabels[c] ?? c).join(', ')
+  // Basis reads as the end user experiences it (Architecture 21.4): emptied
+  // beats audited beats as-dispatched; an unconfirmed receipt is said plainly.
+  const basisText = (r: Row) => r.basis === 'MEASURED_EMPTIED' ? `emptied ${fmt(r.emptied_at)}`
+    : r.sighted_at ? `audited ${fmt(r.sighted_at)}`
+    : r.receipt_state === 'CONFIRMED' ? 'as dispatched' : r.receipt_state === 'ASSUMED' ? 'as dispatched, assumed received' : 'as dispatched, receipt unconfirmed'
   const view: InventoryRow[] = useMemo(() => (rows ?? []).map(r => ({
     containerCode: r.container_code, typeCode: r.type_code, productName: r.product_name ?? 'Unrecorded', batchCode: r.batch_code,
     hazard: hazardText(r), signalWord: r.signal_word,
     quantity: r.quantity_remaining ?? r.quantity_dispatched,
-    // Basis reads as the end user experiences it (Architecture 21.4): emptied
-    // beats audited beats as-dispatched; an unconfirmed receipt is said plainly.
-    basis: r.basis === 'MEASURED_EMPTIED' ? `emptied ${fmt(r.emptied_at)}`
-      : r.sighted_at ? `audited ${fmt(r.sighted_at)}`
-      : r.receipt_state === 'CONFIRMED' ? 'as dispatched' : r.receipt_state === 'ASSUMED' ? 'as dispatched, assumed received' : 'as dispatched, receipt unconfirmed',
+    basis: basisText(r),
     since: fmt(r.last_dispatch_at),
     where: r.sighted_location_id ? locationNames[r.sighted_location_id] : undefined,
     site: siteId === 'ALL' ? (sites.find(s => s.id === r.site_id)?.label ?? 'Site') : undefined,
   })).sort((a, b) => (a.site ?? '').localeCompare(b.site ?? '') || a.containerCode.localeCompare(b.containerCode)), [rows, hazardLabels, locationNames, siteId, sites])
   const totalQty = view.reduce((a, r) => a + (r.quantity ?? 0), 0)
+
+  // The same rows, shaped for the tree. Quantity is what is on hand: an
+  // emptied container counts as nothing and appears on its own line, and a
+  // null quantity stays null rather than being read as empty.
+  const rollupRows: RollupRow[] = useMemo(() => (rows ?? []).map(r => {
+    const qty = r.quantity_remaining ?? r.quantity_dispatched
+    return {
+      containerCode: r.container_code,
+      productName: r.product_name ?? 'Unrecorded',
+      siteName: sites.find(s => s.id === r.site_id)?.label ?? 'Site',
+      capacityLitres: r.capacity_litres,
+      quantity: qty,
+      receipt: (r.receipt_state as RollupRow['receipt']) ?? 'UNCONFIRMED',
+      empty: r.basis === 'MEASURED_EMPTIED' || qty === 0,
+      supplier: (r.ownership ?? 'SUPPLIER') === 'SUPPLIER',
+      where: r.sighted_location_id ? locationNames[r.sighted_location_id] : undefined,
+      basis: basisText(r),
+      since: fmt(r.last_dispatch_at),
+    }
+  }), [rows, sites, locationNames])
+  // One tree feeds the screen, the PDF and the XLSX, so they cannot disagree.
+  const rollupExport = useMemo(() => ({
+    supplied: rollupLines(buildRollup(rollupRows.filter(r => r.supplier), group)),
+    own: rollupLines(buildRollup(rollupRows.filter(r => !r.supplier), group)),
+    groupLabel: group === 'product' ? 'Chemical, then site, then size' : 'Site, then chemical, then size',
+  }), [rollupRows, group])
   const siteName = siteId === 'ALL' ? `All sites (${sites.length})` : (sites.find(s => s.id === siteId)?.label ?? '')
 
   const stem = () => `Clariq-inventory-${siteName.replace(/\s+/g, '-')}-${fileStamp()}`
@@ -105,7 +142,7 @@ export default function InventoryReportPage() {
     if (!rows) return
     setBusy('xlsx')
     try {
-      download(buildInventoryXlsx({ customerName, siteName, schemeTerm: term('SCHEME') || 'the applicable legislation', rows: view, unaccounted, demo: gateway.mode === 'demo' }), stem() + '.xlsx')
+      download(buildInventoryXlsx({ customerName, siteName, schemeTerm: term('SCHEME') || 'the applicable legislation', rows: view, unaccounted, rollup: rollupExport, demo: gateway.mode === 'demo' }), stem() + '.xlsx')
     } catch (e) { setErr(friendlyError(e)) } finally { setBusy(null) }
   }
   const exportPdf = async () => {
@@ -116,7 +153,7 @@ export default function InventoryReportPage() {
       for (const r of rows) if (r.product_name && !products.has(r.product_name)) products.set(r.product_name, r)
       const bytes = await buildInventoryReportPdf({
         customerName, siteName, jurisdiction, listingTerm: term('INVENTORY') || 'Chemical inventory', schemeTerm: term('SCHEME') || 'the applicable legislation',
-        preparedOn: fmt(new Date().toISOString()), rows: view, unaccounted, audited: rows.some(r => r.sighted_at),
+        preparedOn: fmt(new Date().toISOString()), rows: view, unaccounted, audited: rows.some(r => r.sighted_at), rollup: rollupExport,
         sds: [...products.values()].map(p => ({
           productName: p.product_name!, version: p.sds_version, issued: fmt(p.sds_issued_date), reviewDue: fmt(p.sds_review_due),
           overdue: !!p.sds_review_due && new Date(p.sds_review_due) < new Date(),
@@ -156,17 +193,30 @@ export default function InventoryReportPage() {
             <p className="mt-1 text-ink-faint">{rows.some(r => r.sighted_at) ? 'Audited quantities where recorded; otherwise as dispatched.' : 'Quantities as dispatched. Consumption is not recorded unless an audit has been completed.'}</p>
           </section>
 
-          <ul className="divide-y divide-line">
-            {view.map((r, i) => (
-              <li key={r.containerCode} className="py-3">
-                {r.site && (i === 0 || view[i - 1].site !== r.site) && <div className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">{r.site}</div>}
-                <div className="flex justify-between"><span className="font-semibold">{r.containerCode}</span><span>{r.quantity ?? ''} L</span></div>
-                <div className="text-sm">{r.productName}{r.batchCode ? ` · ${r.batchCode}` : ''}{(r as any).where ? ` · ${(r as any).where}` : ''}</div>
-                <div className="text-xs text-ink-faint">{r.hazard || 'Hazard class not recorded'} · {r.basis}{r.since ? ` · on site since ${r.since}` : ''}</div>
-              </li>
-            ))}
-            {view.length === 0 && <li className="py-3 text-ink-soft">No supplier containers recorded on this site.</li>}
-          </ul>
+          <InventoryRollup rows={rollupRows} group={group} onGroupChange={setGroup} />
+
+          {/* The flat listing is still here for anyone who wants to read every
+              line, and it is what the PDF and XLSX carry in full. It is closed
+              by default because 238 rows is not an answer to "how much of what". */}
+          <button type="button" onClick={() => setShowEvery(v => !v)} aria-expanded={showEvery}
+            className="w-full text-left rounded-xl border border-line bg-surface px-4 py-3.5 min-h-[56px] mb-3">
+            <span className="font-medium">{showEvery ? 'Hide the full list' : 'Show every container'}</span>
+            <span className="block text-sm text-ink-soft">{view.length} rows, container by container</span>
+          </button>
+
+          {showEvery && (
+            <ul className="divide-y divide-line">
+              {view.map((r, i) => (
+                <li key={r.containerCode} className="py-3">
+                  {r.site && (i === 0 || view[i - 1].site !== r.site) && <div className="text-xs font-semibold tracking-[0.18em] uppercase text-accent mb-2">{r.site}</div>}
+                  <div className="flex justify-between"><span className="font-semibold">{r.containerCode}</span><span>{r.quantity ?? ''} L</span></div>
+                  <div className="text-sm">{r.productName}{r.batchCode ? ` · ${r.batchCode}` : ''}{(r as any).where ? ` · ${(r as any).where}` : ''}</div>
+                  <div className="text-xs text-ink-faint">{r.hazard || 'Hazard class not recorded'} · {r.basis}{r.since ? ` · on site since ${r.since}` : ''}</div>
+                </li>
+              ))}
+              {view.length === 0 && <li className="py-3 text-ink-soft">No supplier containers recorded on this site.</li>}
+            </ul>
+          )}
 
           <div className="mt-6"><ExportBar onPdf={exportPdf} onXlsx={exportXlsx} busy={busy} disabled={view.length === 0} /></div>
           <p className="mt-3 text-xs text-ink-faint">Prepared to support the customer's own record-keeping under {term('SCHEME') || 'the applicable legislation'}. Not a statement of compliance.</p>

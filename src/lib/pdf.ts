@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
 import QRCode from 'qrcode'
 import type { CustomerReport, Dashboard } from './gateway'
 import { fmtDate } from './dates'
@@ -12,6 +12,45 @@ import logoUrl from '../../assets/clariq-logo.png'
  * All pages are A4. */
 
 const MM = 72 / 25.4
+
+/** Greedy word wrap to a column width in millimetres.
+ *
+ *  Table cells used to be cut with an ellipsis at a fixed width, which lost
+ *  the end of every long value: "Reported to AICIS before intr\u2026" told the
+ *  reader nothing they could act on. Cells now wrap within their column and
+ *  the row grows to fit. A single word wider than the column is broken rather
+ *  than allowed to run past it, and only a cell that needs more than maxLines
+ *  is elided, on the last line. Nothing ever crosses the right margin. */
+function wrapCell(t: string, w: number, size: number, font: PDFFont, maxLines = 3): string[] {
+  const limit = w * MM
+  const fits = (x: string) => font.widthOfTextAtSize(x, size) <= limit
+  if (!t) return ['']
+  if (fits(t)) return [t]
+  const lines: string[] = []
+  let line = ''
+  const push = () => { if (line) { lines.push(line); line = '' } }
+  for (const word of t.split(/\s+/)) {
+    const candidate = line ? line + ' ' + word : word
+    if (fits(candidate)) { line = candidate; continue }
+    push()
+    if (fits(word)) { line = word; continue }
+    // A single word wider than the column: break it on character boundaries.
+    let rest = word
+    while (rest && !fits(rest)) {
+      let cut = rest.length
+      while (cut > 1 && !fits(rest.slice(0, cut))) cut--
+      lines.push(rest.slice(0, cut))
+      rest = rest.slice(cut)
+    }
+    line = rest
+  }
+  push()
+  if (lines.length <= maxLines) return lines
+  const last = lines[maxLines - 1]
+  let cut = last.length
+  while (cut > 1 && !fits(last.slice(0, cut) + '\u2026')) cut--
+  return [...lines.slice(0, maxLines - 1), last.slice(0, cut) + '\u2026']
+}
 const INK = rgb(0.13, 0.145, 0.165)
 const SOFT = rgb(0.29, 0.31, 0.34)
 const FAINT = rgb(0.54, 0.56, 0.60)
@@ -181,7 +220,16 @@ export interface InventoryReportData {
   customerName: string; siteName: string; jurisdiction: 'AU' | 'NZ'; listingTerm: string; schemeTerm: string
   preparedOn: string; rows: InventoryRow[]; unaccounted: string[]; audited: boolean
   sds: { productName: string; version: string | null; issued: string | null; reviewDue: string | null; overdue: boolean }[]
+  rollup?: RollupExport
   demo?: boolean
+}
+
+/** The rolled-up tree (src/lib/rollup.ts), carried into the PDF so the page
+ *  and the screen show the same figures. */
+export type RollupExport = {
+  supplied: { level: number; label: string; litres: number; containers: number; empties: number; basis: string }[]
+  own: { level: number; label: string; litres: number; containers: number; empties: number; basis: string }[]
+  groupLabel: string
 }
 
 /** Customer Chemical Inventory Report (Architecture 0.3, section 13.1). A4, as
@@ -222,11 +270,44 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
   for (const [h, q] of byHazard) text(`${h}: ${q} L`, 9.5, reg, SOFT, L + 4 * MM)
   y -= 3 * MM
 
+  // Rolled up before the listing: how much of what, and where, then the
+  // containers behind it. Quantities are what is on hand; emptied containers
+  // are counted separately and carry no volume.
+  if (r.rollup) {
+    const qtyCol = L + 130 * MM, cntCol = L + 150 * MM
+    const lines = (ls: RollupExport['supplied'], heading: string) => {
+      if (!ls.length) return
+      text(heading, 10, bold, SOFT)
+      page.drawText('Litres', { x: qtyCol, y: y + 5.5 * MM, size: 8, font: bold, color: FAINT })
+      page.drawText('Containers', { x: cntCol, y: y + 5.5 * MM, size: 8, font: bold, color: FAINT })
+      for (const l of ls) {
+        if (y < 26 * MM) newPage()
+        const indent = L + l.level * 5 * MM
+        const size = l.level === 0 ? 9.5 : 8.5
+        const font = l.level === 0 ? bold : reg
+        const label = l.label + (l.empties ? `  (${l.empties} empty)` : '')
+        const room = (qtyCol - indent) / MM - 3
+        page.drawText(fit(label, room, size, font), { x: indent, y, size, font, color: l.level === 0 ? INK : SOFT })
+        page.drawText(String(l.litres), { x: qtyCol, y, size, font, color: INK })
+        page.drawText(String(l.containers), { x: cntCol, y, size, font, color: INK })
+        y -= size * 1.7
+        if (l.basis && l.level === 0) { page.drawText(l.basis, { x: indent, y, size: 7.5, font: reg, color: FAINT }); y -= 4 * MM }
+      }
+      y -= 3 * MM
+    }
+    text('Grouped by ' + r.rollup.groupLabel.toLowerCase(), 8.5, reg, FAINT)
+    y -= 1 * MM
+    lines(r.rollup.supplied, 'Supplier containers')
+    lines(r.rollup.own, "Customer's own containers (recorded on an audit walk)")
+  }
+
   // Listing. Columns sized to A4 (16 mm margins, 178 mm usable): the basis
   // column is short codes so nothing runs past the right edge.
   text('Listing', 10, bold, SOFT)
+  // 142 + 36 = 178 mm, the full text width. The last column was 50 mm wide,
+  // ending 14 mm past the right margin.
   const cols = [L, L + 24 * MM, L + 66 * MM, L + 100 * MM, L + 128 * MM, L + 142 * MM]
-  const widths = [22, 40, 32, 26, 12, 50]
+  const widths = [22, 40, 32, 26, 12, 36]
   const head = ['Container', 'Product', 'Hazard', 'Batch', 'Qty (L)', 'Basis / where']
   const fit = (t: string, w: number, size: number, font = reg) => { let out = t; while (out.length > 1 && font.widthOfTextAtSize(out, size) > w * MM) out = out.slice(0, -1); return out === t ? t : out.slice(0, -1) + '\u2026' }
   const shortBasis = (b: string) => b.replace('as dispatched, receipt unconfirmed', 'unconfirmed').replace('as dispatched, assumed received', 'assumed').replace('as dispatched', 'dispatched')
@@ -235,15 +316,20 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
   let currentSite: string | undefined
   const grouped = r.rows.some(x => x.site)
   for (const x of r.rows) {
-    if (y < 26 * MM) { newPage(); drawHead() }
+    const raw = [x.containerCode, x.productName, x.hazard, x.batchCode ?? '', x.quantity == null ? '' : String(x.quantity), shortBasis(x.basis) + (x.where ? ' / ' + x.where : '')]
+    const cells = raw.map((c, i) => wrapCell(c, widths[i], 8.5, i === 0 ? bold : reg))
+    const lineCount = Math.max(...cells.map(c => c.length))
+    const height = (4.2 + (lineCount - 1) * 3.4) * MM
+    if (y - height < 24 * MM) { newPage(); drawHead() }
     if (grouped && x.site !== currentSite) {
       currentSite = x.site; y -= 1 * MM
       page.drawText(fit(x.site ?? '', 170, 9, bold), { x: L, y, size: 9, font: bold, color: SOFT }); y -= 5.5 * MM
     }
     rule()
-    const cells = [x.containerCode, x.productName, x.hazard, x.batchCode ?? '', x.quantity == null ? '' : String(x.quantity), shortBasis(x.basis) + (x.where ? ' / ' + x.where : '')]
-    cells.forEach((c, i) => page.drawText(fit(c, widths[i], 8.5, i === 0 ? bold : reg), { x: cols[i], y, size: 8.5, font: i === 0 ? bold : reg, color: INK }))
-    y -= 6 * MM
+    cells.forEach((cell, i) => cell.forEach((line, n) => page.drawText(line, {
+      x: cols[i], y: y - n * 3.4 * MM, size: 8.5, font: i === 0 ? bold : reg, color: n === 0 ? INK : SOFT,
+    })))
+    y -= height + 1.8 * MM
   }
   if (r.unaccounted.length) {
     y -= 2 * MM
@@ -388,14 +474,27 @@ function makeDoc() {
       text(sub, 12, reg, SOFT); y -= 1 * MM
       text(meta, 9.5, reg, SOFT); y -= 5 * MM
     }
+    /** Cells wrap inside their column and the row grows to fit; nothing is
+     *  cut at the page edge. Column budgets are asserted against the text
+     *  width in development so a widened column cannot silently run off. */
     const table = (head: string[], cols: number[], widths: number[], rows: string[][], emphasisCol = 0) => {
+      if (import.meta.env.DEV) {
+        const overrun = cols.map((c, i) => c + widths[i]).find(end => end > (R - L) / MM)
+        if (overrun) console.warn(`PDF table column ends at ${overrun} mm, past the ${Math.round((R - L) / MM)} mm text width`)
+      }
       const drawHead = () => { head.forEach((h, i) => page.drawText(h, { x: L + cols[i] * MM, y, size: 8, font: bold, color: FAINT })); y -= 5 * MM }
       drawHead()
       for (const r of rows) {
-        if (y < 26 * MM) { newPage(); drawHead() }
+        const cells = r.map((c, i) => wrapCell(c, widths[i], 8.5, i === emphasisCol ? bold : reg))
+        const lines = Math.max(...cells.map(c => c.length))
+        const height = (4.2 + (lines - 1) * 3.4) * MM
+        if (y - height < 24 * MM) { newPage(); drawHead() }
         rule()
-        r.forEach((c, i) => page.drawText(fit(c, widths[i], 8.5, i === emphasisCol ? bold : reg), { x: L + cols[i] * MM, y, size: 8.5, font: i === emphasisCol ? bold : reg, color: INK }))
-        y -= 6 * MM
+        cells.forEach((cell, i) => cell.forEach((line, n) => page.drawText(line, {
+          x: L + cols[i] * MM, y: y - n * 3.4 * MM, size: 8.5,
+          font: i === emphasisCol ? bold : reg, color: n === 0 ? INK : SOFT,
+        })))
+        y -= height + 1.8 * MM
       }
     }
     const finish = async (foot: string) => { footerText = foot; footer(); return doc.save() }
@@ -418,8 +517,11 @@ export async function buildAicisPrepPackPdf(d: AicisPackData) {
   p.st.y -= 3 * MM
 
   p.text('Chemicals', 10, p.bold, SOFT)
+  // Column budget, in mm from the left margin, against a 178 mm text width.
+  // The old last column was allowed 40 mm from 154, ending at 194: 16 mm past
+  // the edge of the page, which is what sent "Next" off the right-hand side.
   p.table(['Chemical', 'Identity', 'How AICIS sees it', 'This period', 'Records', 'Next'],
-    [0, 46, 74, 118, 140, 154], [44, 26, 42, 20, 12, 40],
+    [0, 46, 73, 112, 139, 154], [44, 25, 37, 25, 13, 24],
     d.rows.map(r => [r.name, r.identity, r.category, (r.volumeKg == null ? '' : `${r.volumeKg} kg`) + (r.limitKg ? ` / ${r.limitKg}` : '') + (r.basis === 'ESTIMATED' ? ' est.' : ''), `${r.held}/${r.applicable}`, r.next ?? 'complete']))
   p.st.y -= 4 * MM
 

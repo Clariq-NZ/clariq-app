@@ -101,7 +101,7 @@ export default function MenuPage() {
       <Group title="HELP">
         <Item to="/guide" label="Show me how" sub="Each task, step by step" />
         <Item to="/ask" label="Ask Clariq" sub="How do I, or what does the law say" />
-        <button type="button" onClick={() => { resetFirstRun(role); nav('/dashboard') }}
+        <button type="button" onClick={() => { void resetFirstRun(role).finally(() => nav('/dashboard')) }}
           className="block w-full text-left rounded border border-line bg-surface px-4 py-3.5 min-h-[56px]">
           <span className="block font-medium">Show me around</span>
           <span className="block text-sm text-ink-soft">The three welcome cards again</span>
