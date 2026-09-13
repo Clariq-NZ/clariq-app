@@ -1045,7 +1045,24 @@ The second half of the fault was the truncation model. Cells were cut with an el
 
 In development the table helper warns when any column budget ends past the text width, so a widened column cannot silently go off the page again.
 
-### 25.4 Decisions
+### 25.4 Fixes on v0.7.39
+
+**Register PDF did nothing (regression introduced in v0.7.38).** The rollup section added to `buildInventoryReportPdf` called the local `fit()` helper, which is declared with `const` further down the same function, in the Listing block. A `const` is in its temporal dead zone until the line that declares it runs, so the call threw `ReferenceError: Cannot access 'fit' before initialization`. TypeScript did not catch it because the call sits inside an arrow function, which is legal to write before the declaration; it is only illegal to run. The XLSX export was unaffected, which is why only the PDF button appeared dead.
+
+`fit` is now a module-level `fitText()` beside `wrapCell()`, so it cannot be used before it exists. Both PDF builders are now rendered end to end in Node as part of the build check, which is what would have caught this: `tsc` and `vite build` both passed on the broken code.
+
+The failure was also invisible. `exportPdf` set the page-level error banner, which renders above a long register, so on a phone nothing appeared to happen. Export failures now report next to the export buttons.
+
+**Register XLSX Summary sheet.** Rebuilt so a site can be picked out at a glance:
+
+- One row per chemical, site and size, each row fully qualified, so the sheet sorts and pivots without anyone reading an indent. Column order follows the grouping: chemical first, or site first when opened from "Our containers".
+- Groups separated by a blank row and closed by a total row.
+- Totals are `SUBTOTAL(9,...)`, so they follow any filter the reader applies rather than going stale. Each carries its computed value as well as the formula: a viewer that does not recalculate still shows the right number, and SheetJS drops a formula cell that has no cached value.
+- Uppercase group headings, and `autoFilter` on the detail Inventory sheet where filtering is actually useful.
+
+**Bold is not available with the current dependency.** `xlsx` 0.18.5 is the SheetJS community build, which accepts `cell.s` and silently discards it: the written `styles.xml` carries a single font and no cell style index. Verified by writing a bold cell and unzipping the result. Headings are written with `cell.s` anyway, so the same code produces real bold the moment the dependency is the styled fork (`xlsx-js-style`, a drop-in with the same API, confirmed to emit `<b/>`). That is a dependency decision for Clariq, not one to take silently; until it is taken, the sheet distinguishes its sections structurally.
+
+### 25.5 Decisions
 
 | Date | Decision | Rationale |
 |---|---|---|
@@ -1060,3 +1077,7 @@ In development the table helper warns when any column budget ends past the text 
 | 2026-09-13 | Top level is the product, not the substance | Product volume is measured; substance quantity needs concentration and is an estimate |
 | 2026-09-13 | PDF table cells wrap inside their column instead of being cut with an ellipsis | The truncated end of a row was the part the reader needed |
 | 2026-09-13 | Column budgets asserted against the 178 mm text width, with a development warning | Two tables had drifted past the right margin and nothing caught it |
+| 2026-09-13 | PDF builders rendered end to end in Node as part of the build check | `tsc` and `vite build` both passed on a PDF that threw at run time |
+| 2026-09-13 | Export failures reported at the export bar, not the top of the page | A dead button on a long register looked like nothing happening |
+| 2026-09-13 | XLSX summary rows fully qualified, totals as SUBTOTAL with cached values | A spreadsheet is sorted and filtered; an indented tree is not |
+| 2026-09-13 | Bold left as `cell.s` against the community build rather than adding the styled fork unasked | A dependency swap is Clariq's call; the code is ready for it |

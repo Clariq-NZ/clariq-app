@@ -21,6 +21,12 @@ const MM = 72 / 25.4
  *  the row grows to fit. A single word wider than the column is broken rather
  *  than allowed to run past it, and only a cell that needs more than maxLines
  *  is elided, on the last line. Nothing ever crosses the right margin. */
+function fitText(t: string, w: number, size: number, font: PDFFont): string {
+  let out = t
+  while (out.length > 1 && font.widthOfTextAtSize(out, size) > w * MM) out = out.slice(0, -1)
+  return out === t ? t : out.slice(0, -1) + '\u2026'
+}
+
 function wrapCell(t: string, w: number, size: number, font: PDFFont, maxLines = 3): string[] {
   const limit = w * MM
   const fits = (x: string) => font.widthOfTextAtSize(x, size) <= limit
@@ -224,12 +230,17 @@ export interface InventoryReportData {
   demo?: boolean
 }
 
-/** The rolled-up tree (src/lib/rollup.ts), carried into the PDF so the page
- *  and the screen show the same figures. */
+/** The rolled-up figures (src/lib/rollup.ts), carried into the exports so the
+ *  page, the sheet and the screen agree. Two shapes of the same tree: a
+ *  printed page reads better indented, a spreadsheet reads better with every
+ *  row carrying its own chemical and site so it can be sorted and pivoted. */
+export type RollupLine = { level: number; label: string; litres: number; containers: number; empties: number; basis: string }
+export type RollupTableRow = { top: string; second: string; size: string; litres: number; containers: number; empties: number; basis: string }
 export type RollupExport = {
-  supplied: { level: number; label: string; litres: number; containers: number; empties: number; basis: string }[]
-  own: { level: number; label: string; litres: number; containers: number; empties: number; basis: string }[]
   groupLabel: string
+  groupedBy: 'product' | 'site'
+  tree: { supplied: RollupLine[]; own: RollupLine[] }
+  table: { supplied: RollupTableRow[]; own: RollupTableRow[] }
 }
 
 /** Customer Chemical Inventory Report (Architecture 0.3, section 13.1). A4, as
@@ -275,7 +286,7 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
   // are counted separately and carry no volume.
   if (r.rollup) {
     const qtyCol = L + 130 * MM, cntCol = L + 150 * MM
-    const lines = (ls: RollupExport['supplied'], heading: string) => {
+    const lines = (ls: RollupLine[], heading: string) => {
       if (!ls.length) return
       text(heading, 10, bold, SOFT)
       page.drawText('Litres', { x: qtyCol, y: y + 5.5 * MM, size: 8, font: bold, color: FAINT })
@@ -287,7 +298,7 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
         const font = l.level === 0 ? bold : reg
         const label = l.label + (l.empties ? `  (${l.empties} empty)` : '')
         const room = (qtyCol - indent) / MM - 3
-        page.drawText(fit(label, room, size, font), { x: indent, y, size, font, color: l.level === 0 ? INK : SOFT })
+        page.drawText(fitText(label, room, size, font), { x: indent, y, size, font, color: l.level === 0 ? INK : SOFT })
         page.drawText(String(l.litres), { x: qtyCol, y, size, font, color: INK })
         page.drawText(String(l.containers), { x: cntCol, y, size, font, color: INK })
         y -= size * 1.7
@@ -297,8 +308,8 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
     }
     text('Grouped by ' + r.rollup.groupLabel.toLowerCase(), 8.5, reg, FAINT)
     y -= 1 * MM
-    lines(r.rollup.supplied, 'Supplier containers')
-    lines(r.rollup.own, "Customer's own containers (recorded on an audit walk)")
+    lines(r.rollup.tree.supplied, 'Supplier containers')
+    lines(r.rollup.tree.own, "Customer's own containers (recorded on an audit walk)")
   }
 
   // Listing. Columns sized to A4 (16 mm margins, 178 mm usable): the basis
@@ -309,7 +320,6 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
   const cols = [L, L + 24 * MM, L + 66 * MM, L + 100 * MM, L + 128 * MM, L + 142 * MM]
   const widths = [22, 40, 32, 26, 12, 36]
   const head = ['Container', 'Product', 'Hazard', 'Batch', 'Qty (L)', 'Basis / where']
-  const fit = (t: string, w: number, size: number, font = reg) => { let out = t; while (out.length > 1 && font.widthOfTextAtSize(out, size) > w * MM) out = out.slice(0, -1); return out === t ? t : out.slice(0, -1) + '\u2026' }
   const shortBasis = (b: string) => b.replace('as dispatched, receipt unconfirmed', 'unconfirmed').replace('as dispatched, assumed received', 'assumed').replace('as dispatched', 'dispatched')
   const drawHead = () => { head.forEach((h, i) => page.drawText(h, { x: cols[i], y, size: 8, font: bold, color: FAINT })); y -= 5 * MM }
   drawHead()
@@ -323,7 +333,7 @@ export async function buildInventoryReportPdf(r: InventoryReportData) {
     if (y - height < 24 * MM) { newPage(); drawHead() }
     if (grouped && x.site !== currentSite) {
       currentSite = x.site; y -= 1 * MM
-      page.drawText(fit(x.site ?? '', 170, 9, bold), { x: L, y, size: 9, font: bold, color: SOFT }); y -= 5.5 * MM
+      page.drawText(fitText(x.site ?? '', 170, 9, bold), { x: L, y, size: 9, font: bold, color: SOFT }); y -= 5.5 * MM
     }
     rule()
     cells.forEach((cell, i) => cell.forEach((line, n) => page.drawText(line, {
@@ -454,7 +464,7 @@ function makeDoc() {
     const W = 210 * MM, H = 297 * MM, L = 16 * MM, R = 194 * MM
     let page = doc.addPage([W, H]); let y = 0
     const st = { get page() { return page }, get y() { return y }, set y(v: number) { y = v } }
-    const fit = (t: string, w: number, size: number, font = reg) => { let out = t; while (out.length > 1 && font.widthOfTextAtSize(out, size) > w * MM) out = out.slice(0, -1); return out === t ? t : out.slice(0, -1) + '\u2026' }
+    const fit = (t: string, w: number, size: number, font = reg) => fitText(t, w, size, font)
     let footerText = ''
     const footer = () => page.drawText(footerText, { x: L, y: 14 * MM, size: 7.5, font: reg, color: FAINT, maxWidth: R - L })
     const newPage = () => { footer(); page = doc.addPage([W, H]); y = H - 20 * MM }

@@ -12,7 +12,7 @@ import { buildInventoryReportPdf, download, type InventoryRow } from '../lib/pdf
 import type { Option } from '../lib/gateway'
 import { fmtDate, fileStamp } from '../lib/dates'
 import { InventoryRollup } from '../components/InventoryRollup'
-import { buildRollup, rollupLines, type Grouping, type RollupRow } from '../lib/rollup'
+import { buildRollup, rollupLines, rollupTable, type Grouping, type RollupRow } from '../lib/rollup'
 
 /** Customer Chemical Inventory Report (Architecture 0.3, section 13.1).
  * One site at a time. Rows come from v_site_inventory: as-dispatched by
@@ -53,6 +53,7 @@ export default function InventoryReportPage() {
   const endUser = isEndUserOrg(user)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
+  const [exportErr, setExportErr] = useState<string | null>(null)
 
   useEffect(() => {
     if (!customerId) { setSites([]); setSiteId(''); return }
@@ -130,24 +131,29 @@ export default function InventoryReportPage() {
     }
   }), [rows, sites, locationNames])
   // One tree feeds the screen, the PDF and the XLSX, so they cannot disagree.
-  const rollupExport = useMemo(() => ({
-    supplied: rollupLines(buildRollup(rollupRows.filter(r => r.supplier), group)),
-    own: rollupLines(buildRollup(rollupRows.filter(r => !r.supplier), group)),
-    groupLabel: group === 'product' ? 'Chemical, then site, then size' : 'Site, then chemical, then size',
-  }), [rollupRows, group])
+  const rollupExport = useMemo(() => {
+    const supplied = buildRollup(rollupRows.filter(r => r.supplier), group)
+    const own = buildRollup(rollupRows.filter(r => !r.supplier), group)
+    return {
+      groupLabel: group === 'product' ? 'Chemical, then site, then size' : 'Site, then chemical, then size',
+      groupedBy: group,
+      tree: { supplied: rollupLines(supplied), own: rollupLines(own) },
+      table: { supplied: rollupTable(supplied), own: rollupTable(own) },
+    }
+  }, [rollupRows, group])
   const siteName = siteId === 'ALL' ? `All sites (${sites.length})` : (sites.find(s => s.id === siteId)?.label ?? '')
 
   const stem = () => `Clariq-inventory-${siteName.replace(/\s+/g, '-')}-${fileStamp()}`
   const exportXlsx = () => {
     if (!rows) return
-    setBusy('xlsx')
+    setBusy('xlsx'); setExportErr(null)
     try {
       download(buildInventoryXlsx({ customerName, siteName, schemeTerm: term('SCHEME') || 'the applicable legislation', rows: view, unaccounted, rollup: rollupExport, demo: gateway.mode === 'demo' }), stem() + '.xlsx')
-    } catch (e) { setErr(friendlyError(e)) } finally { setBusy(null) }
+    } catch (e) { setExportErr(friendlyError(e)) } finally { setBusy(null) }
   }
   const exportPdf = async () => {
     if (!rows) return
-    setBusy('pdf')
+    setBusy('pdf'); setExportErr(null)
     try {
       const products = new Map<string, Row>()
       for (const r of rows) if (r.product_name && !products.has(r.product_name)) products.set(r.product_name, r)
@@ -161,7 +167,7 @@ export default function InventoryReportPage() {
         demo: gateway.mode === 'demo',
       })
       download(bytes, stem() + '.pdf')
-    } catch (e) { setErr(friendlyError(e)) } finally { setBusy(null) }
+    } catch (e) { setExportErr(friendlyError(e)) } finally { setBusy(null) }
   }
 
   return (
@@ -219,6 +225,7 @@ export default function InventoryReportPage() {
           )}
 
           <div className="mt-6"><ExportBar onPdf={exportPdf} onXlsx={exportXlsx} busy={busy} disabled={view.length === 0} /></div>
+          {exportErr && <p className="mt-3 rounded-xl border border-status-overdue px-4 py-3 text-sm">{exportErr}</p>}
           <p className="mt-3 text-xs text-ink-faint">Prepared to support the customer's own record-keeping under {term('SCHEME') || 'the applicable legislation'}. Not a statement of compliance.</p>
         </>
       )}

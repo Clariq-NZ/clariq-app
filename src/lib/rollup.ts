@@ -159,3 +159,27 @@ export function rollupLines(nodes: RollupNode[]): { level: number; label: string
   for (const n of nodes) walk(n, 0)
   return out
 }
+
+/** Fully qualified leaf rows for the spreadsheet: every row carries its own
+ *  chemical, site and size, so the sheet can be sorted, filtered and pivoted
+ *  without reading an indent. The PDF uses rollupLines() instead, because a
+ *  printed page reads better as a tree. */
+export type RollupTableRow = {
+  top: string; second: string; size: string
+  litres: number; containers: number; empties: number; basis: string
+}
+
+export function rollupTable(nodes: RollupNode[]): RollupTableRow[] {
+  const out: RollupTableRow[] = []
+  for (const t of nodes) {
+    for (const s of t.children ?? []) {
+      for (const z of s.children ?? []) {
+        out.push({
+          top: t.label, second: s.label, size: z.label,
+          litres: round(z.litres), containers: z.containers, empties: z.empties, basis: splitText(z.split),
+        })
+      }
+    }
+  }
+  return out
+}
