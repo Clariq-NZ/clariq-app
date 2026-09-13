@@ -23,7 +23,11 @@
  *  concentration and would produce an estimate; that is a separate lens and
  *  is not what this returns. */
 
-export type ReceiptState = 'CONFIRMED' | 'ASSUMED' | 'UNCONFIRMED'
+/** NOT_SUPPLIED since 0054: the customer's own stock, which nobody dispatched
+ *  and nobody will ever confirm receipt of. It is not a fourth degree of
+ *  confidence, it is the absence of the question, so it never appears in a
+ *  receipt split. */
+export type ReceiptState = 'CONFIRMED' | 'ASSUMED' | 'UNCONFIRMED' | 'NOT_SUPPLIED'
 
 export type RollupRow = {
   containerCode: string
@@ -43,7 +47,7 @@ export type RollupRow = {
   since?: string
 }
 
-export type Split = { confirmed: number; assumed: number; unconfirmed: number }
+export type Split = { confirmed: number; assumed: number; unconfirmed: number; notSupplied: number }
 
 export type RollupNode = {
   key: string
@@ -62,8 +66,9 @@ export type RollupNode = {
 
 export type Grouping = 'product' | 'site'
 
-const zero = (): Split => ({ confirmed: 0, assumed: 0, unconfirmed: 0 })
-const bucket = (r: ReceiptState) => r === 'CONFIRMED' ? 'confirmed' : r === 'ASSUMED' ? 'assumed' : 'unconfirmed'
+const zero = (): Split => ({ confirmed: 0, assumed: 0, unconfirmed: 0, notSupplied: 0 })
+const bucket = (r: ReceiptState) => r === 'CONFIRMED' ? 'confirmed' : r === 'ASSUMED' ? 'assumed'
+  : r === 'NOT_SUPPLIED' ? 'notSupplied' : 'unconfirmed'
 const litresOf = (r: RollupRow) => r.empty ? 0 : (r.quantity ?? 0)
 
 function add(node: RollupNode, r: RollupRow) {
@@ -132,6 +137,7 @@ export function totals(nodes: RollupNode[]): RollupNode {
     all.split.confirmed += n.split.confirmed
     all.split.assumed += n.split.assumed
     all.split.unconfirmed += n.split.unconfirmed
+    all.split.notSupplied += n.split.notSupplied
   }
   return all
 }
@@ -143,6 +149,9 @@ export function splitText(s: Split): string {
   if (s.confirmed) parts.push(`${round(s.confirmed)} L confirmed`)
   if (s.assumed) parts.push(`${round(s.assumed)} L assumed`)
   if (s.unconfirmed) parts.push(`${round(s.unconfirmed)} L unconfirmed`)
+  // notSupplied is deliberately absent: receipt does not apply to the
+  // customer's own stock, and a "not supplied" line in a receipt split would
+  // read as a fourth kind of doubt rather than as the question not arising.
   return parts.length > 1 ? parts.join(', ') : ''
 }
 

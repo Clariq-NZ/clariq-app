@@ -97,8 +97,12 @@ export default function InventoryReportPage() {
   const hazardText = (r: Row) => (r.hazard_classes ?? []).map(c => hazardLabels[c] ?? c).join(', ')
   // Basis reads as the end user experiences it (Architecture 21.4): emptied
   // beats audited beats as-dispatched; an unconfirmed receipt is said plainly.
+  // Keyed on `basis` rather than on sighted_at since 0054, because an audit
+  // sighting now stands on its own for stock that was never dispatched.
+  // Nothing here may say "as dispatched" about a container nobody dispatched.
   const basisText = (r: Row) => r.basis === 'MEASURED_EMPTIED' ? `emptied ${fmt(r.emptied_at)}`
-    : r.sighted_at ? `audited ${fmt(r.sighted_at)}`
+    : r.basis === 'MEASURED_AUDITED' ? `audited ${fmt(r.sighted_at)}`
+    : r.basis === 'MEASURED_AS_RECORDED' ? 'as recorded, not walked yet'
     : r.receipt_state === 'CONFIRMED' ? 'as dispatched' : r.receipt_state === 'ASSUMED' ? 'as dispatched, assumed received' : 'as dispatched, receipt unconfirmed'
   const view: InventoryRow[] = useMemo(() => (rows ?? []).map(r => ({
     containerCode: r.container_code, typeCode: r.type_code, productName: r.product_name ?? 'Unrecorded', batchCode: r.batch_code,

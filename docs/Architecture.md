@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.37) in the decision log and sections 20 to 25
+**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.40) in the decision log and sections 20 to 26
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -1081,3 +1081,54 @@ The failure was also invisible. `exportPdf` set the page-level error banner, whi
 | 2026-09-13 | Export failures reported at the export bar, not the top of the page | A dead button on a long register looked like nothing happening |
 | 2026-09-13 | XLSX summary rows fully qualified, totals as SUBTOTAL with cached values | A spreadsheet is sorted and filtered; an indented tree is not |
 | 2026-09-13 | Bold left as `cell.s` against the community build rather than adding the styled fork unasked | A dependency swap is Clariq's call; the code is ready for it |
+
+---
+
+## 26. Own stock, sharing, and what a reset destroys (13 September 2026, v0.7.40)
+
+Migrations 0054 (both projects), demo_0006, demo_0007 and demo_0008 (demo only).
+
+### 26.1 The customer's own stock
+
+A register showing only the supplier's containers is the supplier's delivery note, not the customer's register. Riverside holds 100 containers that are not Clariq's: 58 of their own reagent bottles and winchesters, and 42 drums and IBCs of cleaning chemistry from another supplier. `ownership` distinguishes them (0053) and they roll up on their own line (25.2).
+
+Recording them exposed an assumption. Every container in the register had come from a supplier, so the vocabulary assumed one: the `sighted` CTE inner joined `last_dispatch`, discarding an audit sighting on a container nobody dispatched, and `receipt_state` had no null branch, so a bottle the university bought themselves read as *"as dispatched, receipt unconfirmed"*. 0054 fixes both. `basis` gains `MEASURED_AS_RECORDED`, `receipt_state` gains `NOT_SUPPLIED`, and the receipt split omits it entirely, because receipt is not a fourth degree of doubt about the customer's own stock; the question does not arise.
+
+### 26.2 Who sees it
+
+| Level | The supplier sees | For |
+|---|---|---|
+| `NONE` (default) | Nothing but its own containers | Every new link |
+| `SUMMARY` | Litres and container counts by site and product group. No container codes, no product names, no competitor names | The commercial signal |
+| `FULL` | The register as the customer sees it | Managed-service and consolidation work |
+
+The customer holds the switch. `set_own_stock_sharing()` refuses unless the caller is an administrator of the customer organisation, so there is no path by which a supplier raises its own visibility. A supplier that could reveal its customer's register would have a data grab with a setting on it, not a privacy control, and that does not survive a university procurement review.
+
+`SUMMARY` could not be row-level security, which hands over a row or nothing and cannot hand over a total. It is `v_customer_own_stock_summary`, deliberately not `security_invoker`, filtering itself, carrying no identifiers by construction rather than by policy. `FULL` is four additive read policies scoped to `ownership <> 'SUPPLIER'`.
+
+### 26.3 What a reset destroys
+
+Found while checking that the own-stock seed would survive `reset_demo()`. It would not, and neither would anything else.
+
+`reset_demo()` deletes every business row and calls `seed_demo()`, which knows only the NZ supplier fleet. Everything Riverside is a one-shot `DO` block in a demo migration and exists in no function: the party model and link (demo_0003), 291 containers across four campuses, 20 locations, 93 chemicals and the AICIS introductions (demo_0004, demo_0005), the own stock (demo_0006) and the walks (demo_0007). So 20.5, "Run `reset_demo()` after any sales walk that changed data", has been an instruction to delete the entire AICIS demonstration and leave a supplier fleet with no customer. It has never been run since Riverside was built, which is the only reason this has not already happened.
+
+demo_0008 makes the no-argument call refuse and explain. `reset_demo(true)` still does the old thing for anyone who genuinely wants the supplier fleet alone. **The real repair is outstanding:** each Riverside seed needs to become an idempotent function that `reset_demo()` calls in order.
+
+### 26.4 Two sessions, one database
+
+On 13 September two Claude sessions worked this project against the same Supabase credential, one on a Mac and one on a phone. Both applied a migration named `0054_own_stock_sharing`, an hour apart, to production and demo. A line-by-line comparison found the two identical in every executable line; the only differences were comments. No work was lost, and the duplicate row in `schema_migrations` is left in place as the record of what happened.
+
+Two lessons. Given the same decisions and the same Architecture document, two runs converge on the same implementation, which is reassuring about the design. And neither session could see the other, so the second overwrote the first with `create or replace` and nobody would have known if they had differed. **One session at a time against a live database.**
+
+### 26.5 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-13 | The customer's own stock is the customer's record, in their tenant | It is their bottle and their register |
+| 2026-09-13 | Three sharing levels, default NONE, customer holds the switch | A supplier-controlled switch is not a privacy control |
+| 2026-09-13 | SUMMARY by product group and site, no identifiers, as a self-filtering view | RLS cannot hand over a total; enough to see the opportunity, not enough to work the account |
+| 2026-09-13 | `NOT_SUPPLIED` never appears in a receipt split | Receipt does not apply; showing it reads as a fourth kind of doubt |
+| 2026-09-13 | Basis keyed on `basis`, not on `sighted_at` | An audit sighting now stands alone for stock never dispatched |
+| 2026-09-13 | `reset_demo()` refuses; `reset_demo(true)` keeps the old behaviour | It silently deletes the entire AICIS demonstration |
+| 2026-09-13 | demo_0006 recovered from `schema_migrations` into the repo | The file existed nowhere else; verified byte-identical |
+| 2026-09-13 | One session at a time against a live database | Two agents applied the same migration an hour apart, unaware of each other |
