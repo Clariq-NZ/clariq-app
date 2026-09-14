@@ -255,6 +255,65 @@ export function ProductsPage() {
   )
 }
 
+/** What this organisation's suppliers may see of its own stock (26.2).
+ *
+ *  The customer holds this switch and nobody else: set_own_stock_sharing()
+ *  refuses unless the caller is an administrator of the customer organisation,
+ *  so a supplier cannot raise its own visibility by any route. Default NONE.
+ *  Shown only where a link exists, because on a supplier's settings page it
+ *  would be a control over someone else's data, which is exactly the thing
+ *  this design refuses to build. */
+function OwnStockSharing({ tid }: { tid: string }) {
+  const [links, setLinks] = useState<any[] | null>(null)
+  const [err, setErr] = useState('')
+  const load = () => sb().from('tenant_links')
+    .select('id, share_own_stock, supplier_tenant_id, tenants!tenant_links_supplier_tenant_id_fkey(name)')
+    .eq('customer_tenant_id', tid).eq('status', 'ACTIVE')
+    .then(r => setLinks(r.data ?? []))
+  useEffect(() => { if (tid) void load() }, [tid])
+
+  const set = async (id: string, level: string) => {
+    setErr('')
+    const { error } = await sb().rpc('set_own_stock_sharing', { p_link: id, p_level: level })
+    if (error) { setErr(friendlyError(error)); return }
+    void load()
+  }
+
+  if (!links || links.length === 0) return null
+  const OPTIONS: [string, string, string][] = [
+    ['NONE', 'Nothing', 'They see only the containers they supplied you. This is the default.'],
+    ['SUMMARY', 'A summary', 'How much of each kind of chemistry sits at each site. No container numbers, no product names, no supplier names.'],
+    ['FULL', 'The register', 'Everything you see: containers, products and locations.'],
+  ]
+  return (
+    <section className="mt-8">
+      <h2 className="font-display text-lg font-semibold">What your supplier can see</h2>
+      <p className="text-sm text-ink-soft mt-1 mb-4">
+        Chemicals you hold that your supplier did not supply are your record, not theirs. You decide how much of it they see,
+        and you can change it back at any time.
+      </p>
+      {err && <p className="mb-3 rounded-xl border border-status-overdue px-4 py-3 text-sm">{err}</p>}
+      {links.map(l => (
+        <div key={l.id} className="mb-4 rounded-xl border border-line overflow-hidden">
+          <header className="px-4 py-3 bg-surface border-b border-line font-medium">{l.tenants?.name ?? 'Your supplier'}</header>
+          <ul>
+            {OPTIONS.map(([value, label, detail]) => (
+              <li key={value} className="border-b border-line last:border-0">
+                <button type="button" onClick={() => set(l.id, value)}
+                  aria-pressed={l.share_own_stock === value}
+                  className={`w-full text-left px-4 py-3.5 min-h-[56px] ${l.share_own_stock === value ? 'bg-accent/15' : ''}`}>
+                  <span className="font-medium">{label}{l.share_own_stock === value && ' \u2713'}</span>
+                  <span className="block text-sm text-ink-soft">{detail}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export function SettingsPage() {
   const [settings, setSettings] = useState<any>(null)
   const [tid, setTid] = useState('')
@@ -275,6 +334,7 @@ export function SettingsPage() {
         </select>
       </Field>
       <p className="text-sm text-ink-soft mt-2">Applies to every user of this tenant on their next screen load.</p>
+      <OwnStockSharing tid={tid} />
     </Shell>
   )
 }

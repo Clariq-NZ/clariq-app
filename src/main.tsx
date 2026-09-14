@@ -14,6 +14,7 @@ import MenuPage from './pages/MenuPage'
 import GuidePage from './pages/GuidePage'
 import AskPage from './pages/AskPage'
 import InventoryReportPage from './pages/InventoryReportPage'
+import OwnStockPage from './pages/OwnStockPage'
 import { CustomersPage, NewCustomerPage, CustomerDetailPage, SiteDetailPage, ProductsPage, SettingsPage, ViewAsPage } from './pages/AdminMasterData'
 import { AuditHomePage, AuditSessionPage, SightingPage, AuditResultPage } from './pages/AuditPages'
 import { ChemicalsPage, ChemicalDetailPage, DeliveryPage, AicisPackPage } from './pages/ChemicalsPages'
@@ -70,6 +71,7 @@ const router = createBrowserRouter([{ element: <Root />, children: [
   { path: '/admin/customers/:id', element: staff(<CustomerDetailPage />) },
   { path: '/admin/sites/:id', element: staff(<SiteDetailPage />) },
   { path: '/admin/products', element: staff(<ProductsPage />) },
+  { path: '/report/own-stock', element: staff(<OwnStockPage />) },
   { path: '/admin/settings', element: staff(<SettingsPage />) },
   { path: '/admin/view-as', element: staff(<ViewAsPage />) },
   { path: '/audit', element: staff(<AuditHomePage />) },

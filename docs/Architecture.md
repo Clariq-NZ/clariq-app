@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.40) in the decision log and sections 20 to 26
+**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.42) in the decision log and sections 20 to 28
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -1132,3 +1132,86 @@ Two lessons. Given the same decisions and the same Architecture document, two ru
 | 2026-09-13 | `reset_demo()` refuses; `reset_demo(true)` keeps the old behaviour | It silently deletes the entire AICIS demonstration |
 | 2026-09-13 | demo_0006 recovered from `schema_migrations` into the repo | The file existed nowhere else; verified byte-identical |
 | 2026-09-13 | One session at a time against a live database | Two agents applied the same migration an hour apart, unaware of each other |
+
+---
+
+## 27. The walk and the guides (13 September 2026, v0.7.41)
+
+No migration. Batch 1 of 2; the sharing control and the supplier summary screen follow.
+
+### 27.1 A sighting belongs to the container's owner
+
+`recordSighting` wrote every event into the tenant of the person holding the phone. Harmless while every container came from one supplier, and wrong the moment the customer's own stock existed: a university's own bottle would have landed in its supplier's database, and the customer's sharing setting (26.2) would have governed nothing, because the record was never theirs to govern.
+
+The event now carries the container's `tenant_id`, which is what Architecture 22.3 said all along. `findContainer` returns it and the sighting form passes it through.
+
+This settles who records what. **A supplier records its own containers; an organisation records its own stock.** A supplier scanning a container that is not theirs is told so in a sentence rather than meeting a database refusal.
+
+That is an interpretation of the 13 September rule, "the customer's setting governs everything except supplier-supplied stock", and it is worth naming the alternative that was rejected. A supplier walking a customer site physically sees the customer's own drums, so the walk could have written them into the customer's tenant as a write-only insert the supplier cannot read back. It was not built, because at `NONE` the supplier cannot resolve the container by code in the first place, and a narrow walk-scoped read to work around that would mean `NONE` no longer means none. The simpler reading is also the honest one.
+
+### 27.2 The guide had two audiences and needed three
+
+`GuidePage` filtered on `!s.staff || !cv`, a boolean that predated the party model in section 22. Two consequences, both quietly wrong:
+
+- "Do an audit walk" was `staff: true`, so an **end-user organisation could open `/audit` (24.3) but could not see its guide**.
+- `matchGuide(question, staff)` skipped the same sections, so a university technician asking Ask Clariq "how do I do an audit walk" was routed to the legislation corpus instead of the steps.
+
+`staff: boolean` becomes `audience?: 'supplier' | 'end_user'`, omitted meaning everyone, with `guideFor(audience)` feeding the page, the help mark and Ask Clariq alike. Where the same job is genuinely a different job on each side, there are two entries rather than one hedged to cover both:
+
+| Supplier | End user |
+|---|---|
+| Record an action (fill, dispatch, wash, inspect) | Say a container arrived, or is empty |
+| Set up a customer | Set up our sites and locations |
+| Do an audit walk at a customer site | Do an audit walk of our own sites |
+| Print new labels, returns queue, see what a customer sees | — |
+
+Shared: sign in, scan, what is due back, reports, Ask Clariq.
+
+### 27.3 Corrections to existing entries
+
+- **Labels** said to use "Audit unknown for containers Clariq does not own". Wrong twice: it names Clariq as the party, against the 12 September rule, and own stock is no longer a catch-all container type but `ownership` plus the owning tenant. It now says labels are for containers you own, and that another organisation's containers are recorded by them.
+- **Audit** said to stick a label on anything unlabelled. Removed for the same reason.
+- **Overdue** assumed a supplier's verbs; it now serves both sides and is titled "See what is due back".
+- **Reports** described the register as a flat list. It now describes the tree, the chemical/site switch, and that each figure says where it came from.
+- **Genericised**, since a customer is not always a university: a site is "a campus, depot, plant or branch", and locations are "whatever levels that organisation uses". AICIS wording is untouched, because that genuinely is about introducers.
+
+### 27.4 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-13 | A sighting is written against the container's owner, not the walker | 22.3 said so; the walker's tenant made the customer's setting meaningless |
+| 2026-09-13 | A supplier cannot sight another organisation's containers | At NONE they cannot resolve it anyway, and a walk-scoped read would make NONE mean something less than none |
+| 2026-09-13 | Guide keyed on audience, not a staff flag | End users could do a walk they could not read about, and Ask Clariq mis-routed the question |
+| 2026-09-13 | Two entries where the job differs, not one hedged entry | A supplier's walk and a holder's walk are different jobs |
+| 2026-09-13 | Guide copy genericised away from universities | Councils, depots and food plants are the same product; the demo carries the university flavour |
+
+---
+
+## 28. The sharing control and the summary screen (13 September 2026, v0.7.42)
+
+No migration; 0054 already carries everything the database needs. Batch 2 of 2.
+
+### 28.1 The customer chooses, in Settings
+
+`Settings, What your supplier can see`, shown only where an active link exists, so it never appears on a supplier's settings page as a control over someone else's data. Three choices in the customer's words rather than the database's: **Nothing**, **A summary**, **The register**.
+
+It calls `set_own_stock_sharing()`, which refuses unless the caller is an administrator of the customer organisation. Verified against the demo: the supplier admin is blocked, the Riverside HSW Manager is not, and setting `NONE` drops the supplier's summary rows from 24 to 0 in the same transaction.
+
+The pathway (24.5) gains a week-one task, "Decide what your supplier can see", so the choice is made deliberately at setup rather than found by accident later.
+
+### 28.2 The supplier sees what was offered
+
+`Reports, Chemicals we do not supply` (`/report/own-stock`), reading `v_customer_own_stock_summary`. Customer, then site, then product group, largest volume first. Against the demo this reads, for Riverside: QUAT 1,169 L at Gatton, ALKALINE 906 L at Herston, ACID 813 L at Gatton. That is the commercial picture, and none of it is Clariq's.
+
+Product group, never product name, container code or competitor name. The view carries none of those columns at all, so there is nothing to leak even if the screen were wrong.
+
+The screen states how many customers share and how many do not. A page silently showing three of five would read as "these five hold nothing", which is both false and the reading that loses the sale.
+
+### 28.3 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-13 | The sharing control appears only on a linked customer's settings | On a supplier's page it would be a switch over someone else's data |
+| 2026-09-13 | Three choices in plain words, not the database's NONE/SUMMARY/FULL | The person choosing is deciding what a supplier learns about them |
+| 2026-09-13 | Week-one pathway task to choose | A default nobody chose is not consent |
+| 2026-09-13 | The supplier screen names how many customers are not sharing | Silence about a customer must not read as absence of stock |

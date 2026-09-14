@@ -70,6 +70,7 @@ export default function MenuPage() {
         <Item to="/dashboard/circularity" label="Reuse results" sub="How many times containers went round, and what that saved" />
         <Item to="/report" label={endUser ? 'Our report' : cv ? 'My report' : 'Report for a customer'} sub="Any period, PDF or spreadsheet, by location" />
         <Item to="/report/inventory" label={endUser ? 'Chemicals on our sites' : cv ? 'Chemicals on my site' : 'Chemicals on site'} sub="What is at a location right now" />
+        {staff && !endUser && <Item to="/report/own-stock" label="Chemicals we do not supply" sub="What customers hold in someone else's packaging, where they show you" />}
         {admin && !endUser && <Item to="/admin/view-as" label="See what a customer sees" />}
       </Group>
       {admin && !endUser && (
@@ -87,7 +88,7 @@ export default function MenuPage() {
           <Item to={myCustomer ? `/admin/customers/${myCustomer}` : '/admin/customers'} label="Our sites and locations" sub="Where containers are kept: campus, building, room, cabinet" />
           <Item to="/admin/users" label="People" sub="Who can sign in, and what each person can do" />
           <Item to="/plan" label="Bringing Clariq into use" sub="The pathway, phase by phase, with dates and to-dos" />
-          <Item to="/admin/settings" label="Settings" sub="Region motif" />
+          <Item to="/admin/settings" label="Settings" sub="Region motif, and what your supplier can see" />
         </Group>
       )}
       {user?.introducer && (

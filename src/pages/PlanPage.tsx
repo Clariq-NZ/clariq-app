@@ -66,6 +66,7 @@ export function PlanPage() {
       { code: 'labels', label: 'Name your location levels', detail: 'Faculty and building, or department and room: your words', to: '/admin/customers' },
       { code: 'colleague', label: 'Invite the people who receive deliveries', detail: 'Stores, lab managers, technicians, as Site staff', to: '/admin/users', auto: true },
       { code: 'products', label: 'Add the products you buy', detail: 'Or add them as deliveries arrive; either works', to: '/admin/products', auto: true },
+      { code: 'sharing', label: 'Decide what your supplier can see', detail: 'Nothing, a summary by site, or your whole register. Starts at nothing; you can change it any time', to: '/admin/settings' },
     ] },
     { title: 'Receiving', when: 'Week 2', offsetDays: 14, tasks: [
       { code: 'process', label: 'Agree the process: scan on arrival', detail: 'Whoever unpacks a delivery scans each container where it lands. Three days unscanned and it is assumed received' },

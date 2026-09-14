@@ -44,11 +44,18 @@ export async function addLocation(l: { site_id: string; faculty?: string; buildi
   return data as Location
 }
 export async function findContainer(code: string) {
-  const { data } = await sb().from('containers').select('id, code, status, ownership, current_product_id, container_types(code)').eq('code', code).maybeSingle()
+  const { data } = await sb().from('containers').select('id, code, status, ownership, tenant_id, current_product_id, container_types(code)').eq('code', code).maybeSingle()
   return data as any
 }
-export async function recordSighting(s: { containerId: string; sessionId: string; locationId: string; productId?: string; payload: Record<string, unknown>; notes?: string }) {
-  const t = await tenantId()
+/** A sighting is written against the tenant that owns the container, not the
+ *  tenant of the person holding the phone (Architecture 22.3). Before this,
+ *  a walk wrote everything into the walker's own tenant, which was harmless
+ *  while every container came from one supplier and wrong the moment a
+ *  customer's own stock existed: their bottle would have landed in their
+ *  supplier's database, and the customer's own sharing setting would have
+ *  governed nothing. Pass containerTenantId from findContainer(). */
+export async function recordSighting(s: { containerId: string; containerTenantId?: string; sessionId: string; locationId: string; productId?: string; payload: Record<string, unknown>; notes?: string }) {
+  const t = s.containerTenantId ?? await tenantId()
   const { data, error } = await sb().from('container_events').insert({
     tenant_id: t, container_id: s.containerId, event_type: 'SIGHTED', to_status: null,
     audit_session_id: s.sessionId, location_id: s.locationId, product_id: s.productId ?? null,

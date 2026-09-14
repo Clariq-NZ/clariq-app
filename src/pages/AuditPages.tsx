@@ -146,6 +146,7 @@ export function SightingPage() {
   const [capacity, setCapacity] = useState(''); const [remaining, setRemaining] = useState(''); const [notes, setNotes] = useState(''); const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState<File | null>(null); const [preview, setPreview] = useState('')
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const { user } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   useEffect(() => { (async () => {
     const sess = await A.getSession(session!); setS(sess)
@@ -165,13 +166,21 @@ export function SightingPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setErr('')
     try {
+      // A container belongs to whoever owns it, and its sighting is written
+      // against that organisation (Architecture 22.3). A supplier cannot
+      // record a customer's own stock onto the customer's register, so say so
+      // here rather than letting the database refuse it further down.
+      if (c?.tenant_id && user?.tenant_id && c.tenant_id !== user.tenant_id) {
+        setErr(`${c.code} belongs to another organisation. Their own people record it on their register; you cannot sight it from here.`)
+        setBusy(false); return
+      }
       let locId = loc
       if (newLoc) { const l = await A.addLocation({ site_id: s.site_id, ...newLoc }); locId = l.id }
       const payload: Record<string, unknown> = { condition, ownership }
       if (description) payload.description = description
       if (capacity) payload.capacity_litres = Number(capacity)
       if (remaining) payload.quantity_remaining = Number(remaining)
-      const { eventId, tenantId } = await A.recordSighting({ containerId: c.id, sessionId: session!, locationId: locId, productId: product || undefined, payload, notes: notes || undefined })
+      const { eventId, tenantId } = await A.recordSighting({ containerId: c.id, containerTenantId: c.tenant_id, sessionId: session!, locationId: locId, productId: product || undefined, payload, notes: notes || undefined })
       if (photo) await attachPhoto({ tenantId, containerId: c.id, eventId, file: photo })
       sessionStorage.setItem(`audit:${session}:loc`, locId)
       nav(`/audit/${session}`)
