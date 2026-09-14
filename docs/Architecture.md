@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.42) in the decision log and sections 20 to 28
+**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.42) in the decision log and sections 20 to 29
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -1215,3 +1215,60 @@ The screen states how many customers share and how many do not. A page silently 
 | 2026-09-13 | Three choices in plain words, not the database's NONE/SUMMARY/FULL | The person choosing is deciding what a supplier learns about them |
 | 2026-09-13 | Week-one pathway task to choose | A default nobody chose is not consent |
 | 2026-09-13 | The supplier screen names how many customers are not sharing | Silence about a customer must not read as absence of stock |
+
+---
+
+## 29. The demo reset, and a claim that cannot reach a deploy (13 to 14 September 2026, v0.7.42)
+
+Demo migrations demo_0009 to demo_0015. No production change.
+
+### 29.1 reset_demo() had never been run
+
+demo_0008 stopped `reset_demo()` deleting the AICIS demonstration by making it refuse. Finishing the job meant running it, and running it showed it had been broken since 11 September. Four faults, each found only by execution:
+
+| Fault | Cause |
+|---|---|
+| `container_access_granted_by_event_id_fkey` | Everything added from 0029 on (container_access, chemicals, composition, introductions, evidence, declarations, identity requests) was absent from the delete list. reset_demo was written on 24 August and never revisited |
+| `chemical_batches_introduction_id_fkey` | Introductions deleted before the batches that point at them |
+| `chemical_batches_shipping_document_id_fkey` | Documents deleted before the batches that point at them |
+| `user_invites_link_id_fkey` | `user_invites` survives a reset and carries `link_id` (0030), which nothing detached |
+
+After the third guess the order was stopped being guessed: demo_0012 derives it from a topological sort of every foreign key between the purged tables, children before parents. The `containers`/`recycling_records` cycle is broken by the `UPDATE` that nulls `containers.recycling_record_id`, which was already there and is now load-bearing.
+
+So the demo_0008 guard was protecting a function that would have failed anyway. That is luck, not design, and it is the argument for running destructive code in a rollback transaction rather than reasoning about it.
+
+### 29.2 The demo is not resettable, and that is settled
+
+Two approaches were built and abandoned. Both were defeated by the same fact: the demo seeds were written against a live database and were never meant to be replayed or partially unwound.
+
+**Replay the seeds after a purge.** `demo_seed_scripts` holds all five seeds verbatim and `seed_riverside()` replays them, because a single `EXECUTE` runs a whole multi-statement script including nested `DO` blocks. Two things killed it. `demo_0004` and `demo_0005` hard-code container-type ids that `seed_demo()` regenerates on every reset. And the seeds switch actor with `set_config('request.jwt.claims', ..., true)` so that receipts are written by the university and dispatches by the supplier; replayed inside a function those switches are discarded, so every script ran as whoever `seed_demo()` left behind, and `demo_0004` died in `attach_evidence` with "document not found". Proven with a probe: at top level the actor switches, nested it does not, and stripping `SET search_path` from all three functions did not recover it.
+
+**Scope the purge to the supplier tenant.** Defeated by the party model. Riverside's `customers` row is the supplier's commercial record and lives in the supplier tenant; so do the 291 containers on Riverside's shelves and the container types they use. Only Riverside's own 100 containers and 4 sites are in the Riverside tenant. A tenant-scoped delete therefore removes precisely what it was meant to protect, and carving exceptions around it leaves `seed_demo()` colliding with the container types that had to be kept.
+
+**So `reset_demo()` refuses, in both forms** (demo_0015), with a message naming what would be lost and pointing at the approach that does work: create a new Supabase project and apply `supabase/migrations` then the five seeds in `supabase/demo`, where none of these entanglements exist. That is worth doing when a licensee demo is needed. `demo_seed_scripts` and `seed_riverside()` are kept as its foundation, with all five seeds held; the three not recorded in `schema_migrations` were fetched from the public repo with the `http` extension.
+
+A sales walk's changes now stay in the demo. That has been true for three weeks and has cost nothing.
+
+**What the attempt was worth.** Four real foreign-key faults in `reset_demo` were found and fixed by running it for the first time since 24 August: `container_access` and the whole party model missing from the delete list, introductions deleted before the batches referencing them, documents deleted before the batches referencing them, and `user_invites.link_id` never detached. The function had been broken since 11 September and nobody knew, because nobody ran it. The order is now derived from a topological sort of the foreign-key graph rather than guessed. None of that is load-bearing while the reset refuses, but it is correct if the rebuild path is ever taken.
+
+**The lesson, recorded because it cost most of a day.** The tenant layout in the paragraph above was one query away and would have ruled out both approaches immediately. Establish where the data actually lives before designing anything that moves it.
+
+### 29.3 Conformity claims cannot reach a deploy
+
+Outstanding since 11 September in two lists. `contains_conformity_claim()` guards the database and check constraints guard the report registry, but nothing stopped "certified to ISO 59020" reaching a React string, a PDF template or a guide step, which is where a customer or an auditor would read it.
+
+`scripts/check-conformity-claims.mjs` scans `src`, `labels`, `netlify` and `docs` for the same seven phrases the SQL function matches, and `npm run build` will not proceed if it finds one. Netlify runs `build`, so a claim cannot deploy.
+
+Negations pass, deliberately: the site's strongest line is that we will never tell you we are certified to a circularity standard. The first version tested the whole line for a negation, which let *"certified to ISO 59020, and we do not charge extra"* through. The negation must now precede the phrase within sixty characters. Seven cases are checked, and the script exits non-zero on a planted violation.
+
+### 29.4 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-14 | The demo is not resettable; reset_demo() refuses in both forms | Seeds written against a live database cannot be replayed or partially unwound |
+| 2026-09-14 | A clean demo means a new project from migrations plus seeds | A fresh database has none of the entanglements |
+| 2026-09-13 | Seeds held verbatim in demo_seed_scripts, kept as the foundation for that rebuild | A transcription drifts from the file that built the demo |
+| 2026-09-13 | Delete order derived from the foreign-key graph | Three guesses, three failures |
+| 2026-09-13 | Corpus documents survive a reset | No seed rebuilds them; deleting them would silently empty Ask Clariq |
+| 2026-09-13 | Conformity check gates the build, not just the database | The claim does its damage where a person reads it |
+| 2026-09-13 | A negation counts only if it precedes the phrase | The whole-line test passed a real claim |
