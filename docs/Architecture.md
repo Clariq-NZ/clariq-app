@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 13 September 2026 (app v0.7.42) in the decision log and sections 20 to 29
+**Version:** 0.2 (approved for build); build notes through 14 September 2026 (app v0.7.43) in the decision log and sections 20 to 30
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -1272,3 +1272,46 @@ Negations pass, deliberately: the site's strongest line is that we will never te
 | 2026-09-13 | Corpus documents survive a reset | No seed rebuilds them; deleting them would silently empty Ask Clariq |
 | 2026-09-13 | Conformity check gates the build, not just the database | The claim does its damage where a person reads it |
 | 2026-09-13 | A negation counts only if it precedes the phrase | The whole-line test passed a real claim |
+
+---
+
+## 30. The guide follows the role (14 September 2026, v0.7.43)
+
+No migration. Completes the work started in 27.2.
+
+### 30.1 Audience was not enough
+
+27.2 split the guide by organisation type, supplier or end user. That fixed an end-user organisation being unable to read about a walk it was allowed to do, but it left the coarser fault in place: **every role saw the same list**. A Driver opening "Show me how" was taught to print labels, set up customers and view as a customer, none of which a Driver can do. 21.1 has given each role its own home screen since 30 August; the guide never followed.
+
+`roles?: Role[]` now sits beside `audience`, omitted meaning every role in that audience, and `guideFor(audience, role)` feeds the Guide page, the help mark on every screen and Ask Clariq alike. The allocation is the permission table in 24.2 applied to the guide, so **nobody is taught a screen they would be refused on**.
+
+| Role | Sections | What they no longer see |
+|---|---|---|
+| Admin (supplier) | 17 | — |
+| Warehouse | 11 | Customers, view-as, own stock, people, plan, AICIS |
+| Driver | 7 | Fill and dispatch, returns queue, labels, and all admin |
+| Inspector | 8 | Fill and dispatch, deliveries, labels, and all admin |
+| Sales | 9 | Every container action, the returns queue, labels |
+| Admin (end user) | 12 | Everything supplier-side |
+| Member | 7 | Sites, sharing, people, plan, AICIS |
+| Customer (legacy) | 5 | Everything but sign in, scan, due back, reports, Ask |
+
+### 30.2 One entry became three, and four screens got a guide at last
+
+"Record an action" covered fill, dispatch, deliver, collect, return, wash and inspect in five steps, which is three jobs done by three different people. It is now:
+
+- **Fill and dispatch**, Admin and Warehouse, including the defaults from 24.1 and the Done screen offering "Dispatch it now".
+- **Log a delivery or a collection**, Admin, Warehouse and Driver, built around the loop back to the scanner so a run of twenty is twenty scans. It also says to record Return rather than Collect when unloading at the warehouse, which saves an event.
+- **Return, wash and inspect**, Admin, Warehouse and Inspector, where the grade is the decision and D, E and the authorise flag are explained.
+
+Four screens had no guide at all and now do: **People** (invitations are records, not emails), **Bringing Clariq into use**, **the AICIS record and prep pack**, and, from 28, **choosing what your supplier can see** and **chemicals we do not supply**.
+
+The AICIS entry is the one to read twice. It is the screen an administrator is most anxious about, and it now leads with the fact that nobody creates an introduction: a delivery with "imported by us" ticked creates it. It closes on the binding point, that the pack states what is held and whether an introduction is authorised is the introducer's own declaration.
+
+### 30.3 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-14 | Guide sections scoped by role, from the 24.2 permission table | Teaching someone a screen they will be refused on is worse than teaching them nothing |
+| 2026-09-14 | One action entry split into three, by job rather than by verb | Fill, drive and inspect are three people, not one list |
+| 2026-09-14 | People, plan, AICIS, sharing and own stock added | Every screen a role can reach should have a guide, and these were the gaps |

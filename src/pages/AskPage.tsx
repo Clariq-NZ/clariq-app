@@ -5,7 +5,7 @@ import { inputCls } from '../components/ui'
 import { useAuth, isCustomerView, isEndUserOrg } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { ask, sendFeedback, suggestions, type AskResult, type Jurisdiction } from '../lib/ask'
-import { matchGuide, type GuideSection } from '../lib/guide'
+import { matchGuide, type GuideSection, type Role } from '../lib/guide'
 import { track } from '../lib/track'
 import { PageHead } from '../components/ui'
 import { Link } from 'react-router-dom'
@@ -56,7 +56,8 @@ export default function AskPage() {
     // "How do I" questions answer from the in-app guide, instantly and with a
     // link to the screen. The legislation corpus is for everything else.
     const audience = isEndUserOrg(user) || isCustomerView(user) ? 'end_user' : 'supplier'
-    const g = /how (do|can|should) i|where (do|is|can)|what do i|show me/i.test(text) ? matchGuide(text, audience) : null
+    const role = (user?.role_code ?? 'ADMIN') as Role
+    const g = /how (do|can|should) i|where (do|is|can)|what do i|show me/i.test(text) ? matchGuide(text, audience, role) : null
     if (g) {
       track('guide_match', '/ask', { section: g.id })
       setTurns(t => [...t, { question: text, guide: g }])

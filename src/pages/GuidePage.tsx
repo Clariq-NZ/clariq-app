@@ -2,14 +2,16 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { BrandBar, AppFooter } from '../components/Brand'
 import { PageHead } from '../components/ui'
-import { guideFor } from '../lib/guide'
+import { guideFor, type Role } from '../lib/guide'
 import { useAuth, isCustomerView, isEndUserOrg } from '../lib/auth'
 
 export default function GuidePage() {
   const { user } = useAuth()
   // An end-user organisation is not "staff minus things": it has its own jobs,
   // its own walk and its own words for them.
-  const sections = guideFor(isEndUserOrg(user) || isCustomerView(user) ? 'end_user' : 'supplier')
+  const sections = guideFor(
+    isEndUserOrg(user) || isCustomerView(user) ? 'end_user' : 'supplier',
+    (user?.role_code ?? 'ADMIN') as Role)
   const { hash } = useLocation()
   // The help mark on a screen opens its own section, not the top of the guide.
   useEffect(() => {
