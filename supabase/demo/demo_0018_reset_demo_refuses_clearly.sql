@@ -1,4 +1,4 @@
--- demo_0015: reset_demo refuses, clearly and in both forms. DEMO ONLY.
+-- demo_0018: reset_demo refuses, clearly and in both forms. DEMO ONLY.
 -- Never place in supabase/migrations/ (Architecture 20.2 rule 6).
 --
 -- Decision 14 September 2026: the demo is not resettable, and that is the

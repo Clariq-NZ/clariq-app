@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 14 September 2026 (app v0.7.43) in the decision log and sections 20 to 30
+**Version:** 0.2 (approved for build); build notes through 15 September 2026 (app v0.7.50) in the decision log and sections 20 to 32
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -9,7 +9,9 @@
 
 **Changes 9 and 10 September 2026:** production database purged of seeded demo data (migrations 0022 and 0023); demo rebuilt as a second Supabase project plus a second Netlify site, both from the one repository (new section 20); Netlify sites named `clariq-hub` (production, permanent, printed on labels) and `clariq-demo`; Supabase Free-plan pause recorded as a go-live blocker; auth email moved to custom SMTP (Gmail interim, Resend target).
 
-This document is the single source of truth for how the platform is built. It is updated at the end of every build session. Anything not in here does not exist.
+**Changes 15 September 2026:** the eight role guides and the guide index committed to `docs/guides/`; brand assets to `public/brand/`; `SupplierVisibility.tsx` committed unwired with its wiring note; the labels and first-customer runbook recorded; a versioning rule and a document register for every Clariq document (new section 31); both migration ledgers read from the projects and eight demo files recovered into the repository (new section 32); open items 5, 8, 13, 14, 16 and 17 closed and items 18 to 27 added.
+
+This document is the single source of truth for how the platform is built. It is updated at the end of every build session. Anything not in here does not exist. Every other Clariq document is listed, owned and versioned in section 31.5; a document that is not in that register is not maintained.
 
 ---
 
@@ -495,6 +497,9 @@ Each stage ends with an update to this document.
 | Single Admin is a single point of access | Second Admin recommended before go-live; documented in `Handover.md` |
 | Supabase Free plan pauses a project after seven days without traffic; first visitor after that sees errors until an owner restores it (happened to production 9 Sep 2026) | Production: move to Pro before the first live customer (never pauses, daily backups, section 15). Demo: scheduled keep-awake ping (open item 11) |
 | Netlify site name is baked into every printed label | `clariq-hub` is permanent: never renamed, never deleted and recreated. Adding `app.clariq.nz` later does not retire the netlify.app address |
+| A guide in a customer's hands silently disagrees with the app, and neither the customer nor Clariq can tell | Every document carries a version and a "built against" app version (31.4); the register in 31.5 is checked at the end of every build session, so a screen change names the documents it invalidates |
+| Labels have never been weather tested or wash tested, and it cannot be done retrospectively | Three labels on a spare container, a week outside, one wash cycle, scan all three, before any customer stock is printed. Runbook part A5, open item 18 |
+| Backups have never been restored | A restore into a spare project on a calm day, before real chemicals are in the record. Section 15, open item 21 |
 
 ---
 
@@ -504,19 +509,32 @@ Each stage ends with an update to this document.
 2. Clariq colour palette - logo received 24 Aug 2026 (dark charcoal geometric mark on off-white); palette still required before Stage 2 UI.
 3. Return instructions text for the public scan page.
 4. Label wording confirmation: "CLARIQ / RETURN • REUSE • RECOVER / Container ID / QR / Property of Clariq - please return".
-5. Who at Clariq will be the second Admin.
+5. ~~Who at Clariq will be the second Admin.~~ Closed 15-09-2026: Greg, on both environments. Recorded in the runbook pre-flight.
 6. Clariq to purchase ISO 59004 and ISO 59020 before public marketing claims reference them (section 10.6).
 7. Recycled/renewable content percentages to be requested from the container manufacturer.
-8. Production Supabase project to move from Free to Pro before the first live customer (section 17).
+8. ~~Production Supabase project to move from Free to Pro before the first live customer (section 17).~~ Closed 15-09-2026: production is on Pro. Supersedes item 17.
 9. Drop the `demo_snapshot` schema on production; the demo seed has been reconciled against it (section 20.4).
 10. Custom domains `app.clariq.nz` and `demo.clariq.nz`: optional, when DNS access exists.
 11. Keep-awake ping: built, `netlify/functions/keepalive.mts`; confirm it appears under Functions in both Netlify projects after the next deploy.
 12. Resend SMTP on both projects once `clariq.nz` DNS records can be added; Gmail SMTP is the interim (section 20.6).
-13. Demo banner: built (section 20.2, rule 8).
-14. Branded magic link template on both projects.
+13. ~~Demo banner: built (section 20.2, rule 8).~~ Closed: shipped, section 20.2 rule 8.
+14. ~~Branded magic link template on both projects.~~ Closed 15-09-2026: installed through the Supabase dashboard on both projects, because Auth mints the token and the mail can never be app-sent.
 15. Offline action queue (section 17): not built. Decide whether it is needed before the first warehouse goes live.
-16. Migrations 0027 and 0028 to be applied to production once the project is responsive; both are on demo.
-17. Production to Pro plan: promoted from "before first customer" to "before further maintenance work" after the 10 Sep Disk IO exhaustion made the project unresponsive for the day.
+16. ~~Migrations 0027 and 0028 to be applied to production once the project is responsive.~~ Closed 15-09-2026: both were applied to production on 11 September. Read from the production ledger, not from a document (32.1).
+17. ~~Production to Pro plan.~~ Closed with item 8.
+
+Added 15 September 2026. Items 18 to 22 come from the runbook (31.2); the runbook exists to surface them, and they are carried here because section 18 is the list anyone actually reads.
+
+18. **Weather test the labels.** Three labels on a spare container, a week outside, one wash cycle, scan all three. Record the result in `labels/label-spec.json` and here. Nobody has done this and it cannot be done once stock is in service (runbook A5).
+19. **Dispatch site picker does not read a linked organisation's own sites.** Outstanding since section 23. It is step 6 of onboarding, so it blocks the first delivery to the first linked customer. Test it on demo against Riverside University before booking a customer call (runbook B4).
+20. **Confirm how the `introducer` flag is set on a new end-user tenant.** AICIS screens appear only for organisations carrying it. If there is no UI, the first importing customer needs it set another way (runbook B5).
+21. **Test a restore.** Into a spare project, on a calm day, before real chemicals are in the record. A backup nobody has restored is not a backup (section 15, runbook B1).
+22. **Agree who the customer rings**, Greg or Jay, and put it to the customer in writing (runbook B1).
+23. **Wire `SupplierVisibility.tsx`** per `docs/Queued-supplier-visibility.md` (31.3). When it ships, the "See what a customer sees" row in 21.2 gains "unlinked customers only".
+24. **Commit the runbook to `docs/`.** It exists as a PDF outside the repository, which is the state the guides were in until 15 September (31.2).
+25. **Deposit arrangement and expected return days** agreed with the first customer before the first dispatch. Both are awkward to change once transactions exist; dispatch defaults to 60 days (runbook B5).
+26. **Keep the register in 31.5 current** at the end of every build session, in the same pass that updates this document.
+27. **Production has no ledger row for `0021a_load_corpus_file`** (32.2). The file is in `supabase/migrations/` and the function exists on production, so nothing is broken and nothing is to be done. Recorded so a future rebuild comparison does not read it as a missing object.
 
 ---
 
@@ -608,6 +626,7 @@ Apart:
 
 Both:
 9. `container_events` and `audit_log` are append-only; `containers` is trigger-written only; the ISO wording rule; RLS on every table.
+10. The repository is checked against both ledgers at the end of every build session. `supabase/migrations/` and `supabase/demo/` must each hold a file for every row in the corresponding project's `schema_migrations`, and no two files may share a number. Added 15 September 2026 after the demo folder was found eight files behind (32.2).
 
 ### 20.3 Why a second project rather than an in-memory demo
 
@@ -1245,7 +1264,7 @@ Two approaches were built and abandoned. Both were defeated by the same fact: th
 
 **Scope the purge to the supplier tenant.** Defeated by the party model. Riverside's `customers` row is the supplier's commercial record and lives in the supplier tenant; so do the 291 containers on Riverside's shelves and the container types they use. Only Riverside's own 100 containers and 4 sites are in the Riverside tenant. A tenant-scoped delete therefore removes precisely what it was meant to protect, and carving exceptions around it leaves `seed_demo()` colliding with the container types that had to be kept.
 
-**So `reset_demo()` refuses, in both forms** (demo_0015), with a message naming what would be lost and pointing at the approach that does work: create a new Supabase project and apply `supabase/migrations` then the five seeds in `supabase/demo`, where none of these entanglements exist. That is worth doing when a licensee demo is needed. `demo_seed_scripts` and `seed_riverside()` are kept as its foundation, with all five seeds held; the three not recorded in `schema_migrations` were fetched from the public repo with the `http` extension.
+**So `reset_demo()` refuses, in both forms** (demo_0018, renumbered from demo_0015 on 15 September, 32.3), with a message naming what would be lost and pointing at the approach that does work: create a new Supabase project and apply `supabase/migrations` then the five seeds in `supabase/demo`, where none of these entanglements exist. That is worth doing when a licensee demo is needed. `demo_seed_scripts` and `seed_riverside()` are kept as its foundation, with all five seeds held; the three not recorded in `schema_migrations` were fetched from the public repo with the `http` extension.
 
 A sales walk's changes now stay in the demo. That has been true for three weeks and has cost nothing.
 
@@ -1315,3 +1334,156 @@ The AICIS entry is the one to read twice. It is the screen an administrator is m
 | 2026-09-14 | Guide sections scoped by role, from the 24.2 permission table | Teaching someone a screen they will be refused on is worse than teaching them nothing |
 | 2026-09-14 | One action entry split into three, by job rather than by verb | Fill, drive and inspect are three people, not one list |
 | 2026-09-14 | People, plan, AICIS, sharing and own stock added | Every screen a role can reach should have a guide, and these were the gaps |
+
+---
+
+## 31. The documentation set, and how it is versioned (15 September 2026, v0.7.44 to v0.7.49)
+
+No migration. Six commits: documentation, brand assets, and one component deliberately left unwired.
+
+### 31.1 What landed
+
+| Version | Commit | What |
+|---|---|---|
+| v0.7.44 | `a7fb80c` | The eight role guides and the index committed to `docs/guides/` as .docx and .pdf. Guides 1, 2, 3 and 5 were corrected on the way in: 14 empty callout cards filled, stale v0.7.36 stamps fixed, the Guide 1 changelog folded into the body, address card line breaks restored. Guides 4, 6, 7 and 8 unchanged |
+| v0.7.45 | `a937ff6` | Brand assets to `public/brand/`: lock-ups, symbols, square, round and rectangular marks, gold and silver, off-black and stone-white |
+| v0.7.46 | `dfb1c47` | `src/components/SupplierVisibility.tsx`, imported by nothing, with `docs/Queued-supplier-visibility.md` holding the wiring steps (31.3) |
+| v0.7.47 | `1fde873` | `public/brand/clariq-email-logo.png` |
+| v0.7.48 | `3bff556` | The same asset replaced |
+| v0.7.49 | `7857f79` | Guide 6 update |
+
+The guides are now in the repository rather than in a folder on one laptop. That is the point of the batch: a guide that disagrees with the app is a support call, and a guide nobody can find is worse.
+
+### 31.2 The runbook
+
+`Clariq-Runbook-Labels-and-First-Customer.pdf`, 15 September 2026, written against v0.7.47. Two parts, QR labels and onboarding the first customer. It is the operational sequence around the screens Guide 1 documents: what to do before touching the app, and the things that will bite if nobody has thought about them. Where the two disagree, Guide 1 is the product and the runbook is the practice.
+
+It is not in the repository. Open item 24.
+
+Five open items come out of it, carried into section 18 as items 18 to 22. Two of them stand between Clariq and a first delivery: the label weather test, which cannot be done retrospectively, and the dispatch site picker, which does not yet read a linked organisation's own sites and is therefore step 6 of the onboarding sequence failing on the call rather than on a Tuesday.
+
+### 31.3 Supplier visibility, built and held
+
+Signed in to demo as the supplier, "See what a customer sees" on Riverside University showed no AICIS record. That is correct behaviour: the lens filters supplier screens to one `customer_id`, and it does not adopt the customer's tenant, flags or jurisdiction. The label promises something the feature has not done since the party model landed in section 22.
+
+For a customer with `linked_tenant_id` set, the lens entry is replaced by a plain statement of what the supplier can and cannot see of that organisation. The copy is a description of the RLS rules in 22.3 and 22.4, not a claim; if those rules move, the text moves with them. Unlinked customers keep the lens unchanged, because for them it is still accurate: their users live inside the supplier tenant.
+
+The component is committed and imported by nothing. Wiring, the checks before commit, and the follow-on are in `docs/Queued-supplier-visibility.md`. Ready code held out of a batch is lost code unless the steps travel with it, which is why the note is in `docs/` and not in a chat.
+
+### 31.4 Versioning: the rule
+
+Standing instruction from the owner, 15 September 2026. Every Clariq document carries a version. A version moves only when the change is consequential to the person reading it.
+
+**The test.** Would a reader who had already followed this document now do something differently? If yes, the version moves. If no, it holds.
+
+| Consequential, the version moves | Not consequential, the version holds |
+|---|---|
+| A step changes, is added or removed | Typography, spelling, grammar |
+| A screen, route, button or label named in the document changes | Layout, page breaks, image swaps |
+| A rule, threshold, default or permission changes | Section numbering and internal cross-references |
+| A warning, a limitation or a known gap is added or removed | A changelog or housekeeping edit |
+| The document is reorganised enough that it has to be read again | Anything the reader cannot act on |
+
+Second decimal for a consequential change, whole number for a rewrite: 1.0 to 1.1 for a corrected step, 1.x to 2.0 for a restructure.
+
+**Three fields, because there are three questions.**
+
+| Field | The question it answers | It moves when |
+|---|---|---|
+| Document version | Has what I have to do changed? | A consequential change, per the test above |
+| Built against | Which app was this last checked against? | Every time the document is checked against the app, whether or not it changed |
+| Last touched | Is anyone still looking after this? | Every edit, including a typo |
+
+**Where they sit on a guide.** The document version and the date go in the running footer, where a reader sees them on every page. The app version comes off the running footer and onto the front matter as a single "built against" line.
+
+Today every guide footer reads *Clariq, app v0.7.43, 14-09-2026*. That stamp was stale six commits later on the same day, because the app version is the commit count and moves several times a day. A footer that is reliably wrong teaches a reader to ignore the footer, including the part of it that is right. The app's own footer is where an app version should be read, and Guide 1 already tells an Admin to quote it when reporting a problem.
+
+**Starting point.** The eight guides and the index are 1.0 as committed at v0.7.43. None has been in a customer's hands, so the corrections made on the way into the repository do not need a number of their own and the clock starts clean.
+
+### 31.5 The document register
+
+Every Clariq document, its owner, its version and what it was last checked against. If a document is not in this table, nobody owns it. Kept current at the end of every build session, in the same pass that updates this document (open item 26).
+
+| Document | Where | Customer facing | Version | Built against | Last touched |
+|---|---|---|---|---|---|
+| Architecture (this document) | `docs/Architecture.md` | no | 0.2, see 31.6 | v0.7.49 | 15-09-2026 |
+| Guide 1, Running Clariq (Clariq Admin) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 2, Your first month (Customer Admin) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 3, Filling, sending and receiving (Warehouse) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 4, Deliveries and collections (Driver) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 5, Grading and audit walks (Inspector) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 6, Customers, reports and deposits (Sales) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 7, Scanning chemicals in and out (Site staff) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide 8, Looking at your containers (Customer, view only) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Guide index | `docs/guides/index.pdf` | yes | 1.0 | v0.7.43 | 15-09-2026 |
+| Runbook: labels and the first customer | not in repo, open item 24 | no | 1.0 | v0.7.47 | 15-09-2026 |
+| Handover | `docs/Handover.md` | no | 0.1, skeleton | v0.7.x, unchecked | 11-09-2026 |
+| Demo manual checks | `docs/Demo_Manual_Checks.md` | no | 1.0 | v0.7.x, unchecked | 11-09-2026 |
+| Hub and demo guide (Jay) | `docs/Jay_Hub_and_Demo_Guide.docx` | no | 1.0 | v0.7.x, pre party model | 10-09-2026 |
+| Queued: supplier visibility | `docs/Queued-supplier-visibility.md` | no | 1.0 | v0.7.46 | 15-09-2026 |
+| Brand guidelines | repo root | no | 1.0 | not applicable | 26-08-2026 |
+| Marketing site copy | outside the repo | yes | 1.0 | not applicable | 28-08-2026 |
+| Competitive landscape, ANZ | outside the repo | no | 1.0 | not applicable | 28-08-2026 |
+
+Three entries are flagged honestly rather than tidily. `Handover.md` is a skeleton with TODOs, and Architecture principle 4 rests on it. The Jay guide predates the party model, so an end-user organisation does not exist in it. `Demo_Manual_Checks.md` has never had its boxes ticked on a phone. None of the three has been checked against an app version, which is why "built against" reads unchecked rather than guessing one.
+
+### 31.6 This document's own version
+
+Architecture.md has said 0.2 since 24 August while eleven sections were appended to it. The number stopped carrying information somewhere around section 22.
+
+Under 31.4 this is an internal document, so its version moves on a structural revision rather than on a build note, and the build record is the date and app version in the header, which it already carries. That is why the header moved to v0.7.49 today and the version did not.
+
+0.3 is due when sections 20 to 31 are folded back into 1 to 19 and the document reads as one architecture again rather than an architecture plus a build diary. Sections 1 to 19 now describe a single-tenant supplier product that the party model replaced; a reader taking them at face value would be wrong about tenancy, roles, the register and the reports. That fold is real work, not a renumbering, and it should happen before a licensee, a buyer or a second developer reads this document. Recorded here so it is a decision rather than a drift.
+
+### 31.7 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-15 | Every document carries a version; the version moves only on a change consequential to the reader | Owner instruction. A number that moves on every typo tells a reader nothing, and one that never moves tells them less |
+| 2026-09-15 | Three fields: document version, built against, last touched | "Has my job changed", "which app was this checked against" and "is this maintained" are three questions; one number cannot answer them |
+| 2026-09-15 | App version off the guide running footer, onto a front-matter "built against" line | The commit count moves several times a day, so a footer stamped with it is wrong by teatime and trains the reader to ignore the footer |
+| 2026-09-15 | The eight guides and the index start at 1.0 as at v0.7.43 | None has reached a customer; the corrections made on the way into the repository need no number |
+| 2026-09-15 | A document register lives in this document, checked every build session | A document with no owner and no version is how an app and its instructions drift apart without anyone noticing |
+| 2026-09-15 | Architecture.md stays 0.2; 0.3 is the fold of sections 20 to 31 back into 1 to 19 | Internal document, so build notes are dated rather than numbered. Sections 1 to 19 currently describe a product the party model replaced |
+| 2026-09-15 | `SupplierVisibility` committed unwired, with its wiring note in `docs/` rather than in a chat | Ready code held out of a batch is lost code unless the steps travel with it |
+| 2026-09-15 | Runbook open items carried into section 18 rather than left in the runbook | Section 18 is the list anyone actually reads |
+
+---
+
+## 32. The repository and the databases reconciled (15 September 2026, v0.7.50)
+
+No migration. Eight recovered demo files, one renumber, one README rewrite.
+
+### 32.1 What was checked, and how
+
+The Supabase connector was confirmed on the Clariq organisation (`unzhtpqwylazlovaylke`). Both projects are `ACTIVE_HEALTHY` in `ap-southeast-2`: production `Circular Container Tracker` (`oksxzvomjjsjhjqifqhk`) and `clariq-demo` (`yuwpakqhcwjheibfaeof`).
+
+Both migration ledgers were read from `supabase_migrations.schema_migrations` on each project rather than from any document, which is the standing rule and the reason the next subsection exists.
+
+Shared migrations run to **0054 on both projects**. 0027 and 0028 were applied to production on 11 September, which closes open item 16. No demo function has reached production: `seed_demo`, `reset_demo` and `seed_riverside` exist on the demo project only, so rule 6 of 20.2 is holding.
+
+### 32.2 Three discrepancies
+
+**0054 is recorded twice on both projects.** Applied at 02:31 and again at 03:32 on 13 September, production and demo alike. The migration is idempotent throughout (`create or replace`, `add column if not exists`, `drop policy if exists`), so both databases are correct and no object was created twice. The ledgers each carry a duplicate name, and they keep it: a row is not deleted from a ledger to make it read better, which is the same argument that governs `container_events`. The rule that would have prevented it is already written down, 20.2 rule 1, one `apply_migration` call per migration per project.
+
+**Production has no ledger row for `0021a_load_corpus_file`.** The file is in `supabase/migrations/`, and the function exists on production, where 0027 later hardened its grants. Applying `supabase/migrations` to a fresh project reproduces it. The production ledger simply does not admit to it. Nothing to fix, and open item 27 records it so a future rebuild comparison does not read it as a missing object.
+
+**The repository was eight files behind the demo database**, which is the one that mattered. `demo_0010` to `demo_0014`, `demo_0015_baseline_snapshot_reset`, `demo_0016` and `demo_0017` were applied to demo on 14 September and never came back into `supabase/demo/`. Section 29.1 records the work; the SQL that did it was only in the database. 29.2 says the rebuild path for a licensee demo is "apply `supabase/migrations` then the seeds in `supabase/demo`", and that path did not reproduce the demo we have.
+
+### 32.3 The recovery, and the renumber
+
+The statements were pulled verbatim from `supabase_migrations.schema_migrations` on demo and each recovered file was byte-checked against the length the ledger holds. The repository now carries the SQL that was actually applied rather than a transcription of it.
+
+`demo_0015` was used twice. `demo_0015_baseline_snapshot_reset` was applied at 06:38 and `demo_0015_reset_demo_refuses_clearly` at 07:20, after `demo_0016` and `demo_0017`. The later one is renamed **`demo_0018_reset_demo_refuses_clearly`**, which is both unique and chronologically honest: the refusal is the last word on the reset, not the fifteenth. Its file comment and the reference in 29.2 move with it.
+
+`supabase/demo/README.md` was rewritten. Its order of application stopped at 0026, it listed none of the demo seeds, and it still told the reader to run `select reset_demo();` after a sales walk, which has been wrong since 14 September and is exactly the kind of instruction that gets followed at the worst moment.
+
+### 32.4 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-09-15 | The repository is checked against both ledgers every build session (20.2 rule 10) | Eight files lived only in a database for a day, while a document said the rebuild path worked |
+| 2026-09-15 | Recovered SQL taken verbatim from the ledger and byte-checked, not rewritten from the decision log | A transcription is a new file that happens to resemble the one that ran |
+| 2026-09-15 | Duplicate and missing ledger rows are recorded, not corrected | A migration ledger is a record of what happened, not a tidy list. The same argument as append-only events |
+| 2026-09-15 | `demo_0015_reset_demo_refuses_clearly` renumbered to `demo_0018` | It was applied last, after 0016 and 0017, and two files cannot share a number |
+| 2026-09-15 | `supabase/demo/README.md` rewritten rather than patched | It told the reader to run a function that now refuses, and a wrong instruction is worse than none |
