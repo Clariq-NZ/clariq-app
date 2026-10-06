@@ -5,6 +5,23 @@
 [build.environment]
   NODE_VERSION = "24"
 
+# Custom domains (Architecture section 33). The netlify.app addresses forward,
+# path and all, to the clariq.nz address of the same site, so an old bookmark,
+# an old email or a label carrying a netlify.app URL still lands on the right
+# container. One file builds both sites; each rule matches only its own host.
+# These must stay above the single-page-app rule, which would otherwise answer first.
+[[redirects]]
+  from = "https://clariq-hub.netlify.app/*"
+  to = "https://app.clariq.nz/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://clariq-demo.netlify.app/*"
+  to = "https://demo.clariq.nz/:splat"
+  status = 301
+  force = true
+
 # Single-page app: every path (including /c/CLQ-000127 from a QR scan) serves index.html
 [[redirects]]
   from = "/*"

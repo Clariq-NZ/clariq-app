@@ -19,9 +19,9 @@ All accounts belong to Clariq. Individuals are collaborators, never owners.
 |---|---|---|---|
 | Supabase | Database, auth, storage, edge functions | clariqnz@gmail.com | Org `unzhtpqwylazlovaylke`. Production: "Circular Container Tracker", ref `oksxzvomjjsjhjqifqhk`. Demo: "clariq-demo", ref `yuwpakqhcwjheibfaeof`. Both Sydney, both Free plan: see section 3 |
 | GitHub | Source code | clariqnz@gmail.com | Org: Clariq-NZ, repo: clariq-app (public, for Netlify free tier) |
-| Netlify | Hosting and deploys | clariqnz@gmail.com | Team clariqnz, Pro plan. Projects `clariq-hub` (production, permanent, on labels) and `clariq-demo`. Custom domains optional later |
-| Resend | Magic links and digests, target | clariqnz@gmail.com | Needs `clariq.nz` DNS records; until then Supabase Auth sends via Gmail SMTP (section 3) |
-| Domain (clariq.nz) | app.clariq.nz CNAME | TODO | Held by website host |
+| Netlify | Hosting and deploys | clariqnz@gmail.com | Team clariqnz, Pro plan. Projects `clariq-hub` (production, never renamed or deleted) and `clariq-demo`. Custom domains `app.clariq.nz` and `demo.clariq.nz` attached 6 Oct 2026, Let's Encrypt certificates renew automatically |
+| Resend | Magic links and digests, target | clariqnz@gmail.com | DNS access to `clariq.nz` now exists (6 Oct 2026); until Resend's records are added, Supabase Auth sends via Gmail SMTP (section 3) |
+| Domain (clariq.nz) | Registration and DNS for `app.` and `demo.` | TODO: name the 1stdomains login holder | Registrar and DNS host 1stdomains (nameservers `ns1`/`ns2.1stdomains.net.nz`). Every printed label depends on this registration: keep auto-renew on. Records listed in Architecture 33. The website (Shopify) and Microsoft 365 email also live on this domain |
 
 Credentials live in a password manager owned by Clariq, never in this
 repository. TODO (Stage 0): name the password manager and who holds access.
@@ -30,10 +30,12 @@ repository. TODO (Stage 0): name the password manager and who holds access.
 
 One repository, two Supabase projects, two Netlify projects (Architecture section 20).
 
-- Production: Netlify `clariq-hub` at `https://clariq-hub.netlify.app`, Supabase
+- Production: Netlify `clariq-hub` at `https://app.clariq.nz` (the old
+  `https://clariq-hub.netlify.app` forwards to it), Supabase
   `oksxzvomjjsjhjqifqhk`. Env vars `VITE_SUPABASE_URL` and
   `VITE_SUPABASE_ANON_KEY` (legacy anon key) set in Netlify.
-- Demo: Netlify `clariq-demo` at `https://clariq-demo.netlify.app`, Supabase
+- Demo: Netlify `clariq-demo` at `https://demo.clariq.nz` (the old
+  `https://clariq-demo.netlify.app` forwards to it), Supabase
   `yuwpakqhcwjheibfaeof`. Same two env var names, demo values. Seeded fleet;
   `select reset_demo();` in the demo SQL editor restores it.
 - A local checkout with no `.env` runs the in-memory gateway; `?demo=1` forces
@@ -104,11 +106,13 @@ One repository, two Supabase projects, two Netlify projects (Architecture sectio
 - Geometry: `labels/label-spec.json`. TODO: confirm final waterproof label
   stock and update the spec before the first production print.
 - Labels are printed from the production app only and carry
-  `https://clariq-hub.netlify.app/c/<ID>`. That address is permanent: the
-  `clariq-hub` Netlify project is never renamed or recreated. Adding a
-  custom domain later keeps the netlify.app address working. Any labels
-  printed before 10 September 2026 carry a retired address and must be
-  discarded.
+  `https://app.clariq.nz/c/<ID>` (`labels/label-spec.json`). That address is
+  permanent, so two things must never lapse: the `clariq.nz` registration at
+  1stdomains, and the `app` CNAME pointing at `clariq-hub.netlify.app`
+  (Architecture 33). The `clariq-hub` Netlify project is never renamed or
+  recreated either: its netlify.app address forwards to `app.clariq.nz`, which
+  keeps any label carrying it working. Any labels printed before 10 September
+  2026 carry a retired address and must be discarded.
 
 ## 10. Scheduled jobs
 

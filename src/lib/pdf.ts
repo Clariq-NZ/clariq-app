@@ -4,6 +4,7 @@ import type { CustomerReport, Dashboard } from './gateway'
 import { fmtDate } from './dates'
 import spec from '../../labels/label-spec.json'
 import logoUrl from '../../assets/clariq-logo.png'
+import { isDemoHost } from './env'
 
 /** Browser PDF builders.
  * Labels: same geometry source (labels/label-spec.json) as the CLI script in
@@ -12,6 +13,13 @@ import logoUrl from '../../assets/clariq-logo.png'
  * All pages are A4. */
 
 const MM = 72 / 25.4
+
+/** Where a label's QR code points. Production labels use the permanent address
+ *  in label-spec.json (https://app.clariq.nz/c/), the same one the CLI script
+ *  prints. A sheet printed from the demo site points at the demo instead, so a
+ *  test label scanned on a phone opens the demo container it was made for, not
+ *  a production "not found". Architecture section 33. */
+const QR_BASE = isDemoHost ? 'https://demo.clariq.nz/c/' : spec.base_url
 
 /** Greedy word wrap to a column width in millimetres.
  *
@@ -85,7 +93,7 @@ export async function buildLabelSheetPdf(ids: string[], opts: { sample?: boolean
     const pad = 6 * MM
     const id = ids[i]
 
-    const qrDataUrl = await QRCode.toDataURL(spec.base_url + id, {
+    const qrDataUrl = await QRCode.toDataURL(QR_BASE + id, {
       errorCorrectionLevel: 'H', margin: 0, scale: 12,
       color: { dark: '#21252A', light: '#FFFFFF' },
     })

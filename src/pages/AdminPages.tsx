@@ -68,8 +68,8 @@ export function CreateContainersPage() {
           <PrimaryButton onClick={labels}>Download label sheet (PDF)</PrimaryButton>
           {gateway.mode === 'demo' && (
             <p className="text-sm text-ink-soft">
-              Demo labels are watermarked. Production printing waits until app.clariq.nz is live,
-              because the printed URL is permanent.
+              Demo labels are watermarked and open the demo when scanned. Real labels are printed
+              from app.clariq.nz only, because the printed address is permanent.
             </p>
           )}
           <Link to="/dashboard" className="block text-center underline text-ink-soft">Done</Link>

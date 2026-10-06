@@ -1,6 +1,6 @@
 # Clariq Circular Container Platform - Architecture
 
-**Version:** 0.2 (approved for build); build notes through 15 September 2026 (app v0.7.50) in the decision log and sections 20 to 32
+**Version:** 0.2 (approved for build); build notes through 6 October 2026 (app v0.7.51) in the decision log and sections 20 to 33
 **Date:** 24 August 2026
 **Status:** Approved - Stage 0 may begin
 **Owner:** Clariq
@@ -10,6 +10,8 @@
 **Changes 9 and 10 September 2026:** production database purged of seeded demo data (migrations 0022 and 0023); demo rebuilt as a second Supabase project plus a second Netlify site, both from the one repository (new section 20); Netlify sites named `clariq-hub` (production, permanent, printed on labels) and `clariq-demo`; Supabase Free-plan pause recorded as a go-live blocker; auth email moved to custom SMTP (Gmail interim, Resend target).
 
 **Changes 15 September 2026:** the eight role guides and the guide index committed to `docs/guides/`; brand assets to `public/brand/`; `SupplierVisibility.tsx` committed unwired with its wiring note; the labels and first-customer runbook recorded; a versioning rule and a document register for every Clariq document (new section 31); both migration ledgers read from the projects and eight demo files recovered into the repository (new section 32); open items 5, 8, 13, 14, 16 and 17 closed and items 18 to 27 added.
+
+**Changes 6 October 2026:** the platform moved to its own domain. Production is `app.clariq.nz` and the demo is `demo.clariq.nz`; both netlify.app addresses forward to them. The DNS records, the Supabase and Netlify settings, the label rule and what is still to tidy are in the new section 33. Sections 2, 17, 18, 20.1, 20.2 and 20.7 and the register in 31.5 are updated to match.
 
 This document is the single source of truth for how the platform is built. It is updated at the end of every build session. Anything not in here does not exist. Every other Clariq document is listed, owned and versioned in section 31.5; a document that is not in that register is not maintained.
 
@@ -39,7 +41,7 @@ Design principles, in priority order:
 | Front end | React + TypeScript + Vite, PWA (installable, offline shell) | Static build, no server rendering needed. |
 | Styling | Tailwind CSS with a Clariq design-token layer | Tokens (colour, type, spacing) live in one file for rebranding. |
 | Hosting / CDN | Netlify (Pro), two projects from one repo: `clariq-hub` and `clariq-demo` (section 20) | Static PWA; Netlify and Vercel are equivalent for this build. Known over unknown. |
-| Domain | `clariq-hub.netlify.app` (production, permanent) and `clariq-demo.netlify.app` | Custom domains `app.clariq.nz` and `demo.clariq.nz` are optional later additions; Netlify serves both addresses side by side, so labels printed with the netlify.app address never break. Marketing site untouched. |
+| Domain | `app.clariq.nz` (production) and `demo.clariq.nz`, from 6 October 2026 (section 33) | DNS at 1stdomains; Netlify issues the certificates. The old `clariq-hub.netlify.app` and `clariq-demo.netlify.app` forward to them, path and all. Marketing site (Shopify, `clariq.nz` and `www`) untouched. |
 | Email | Custom SMTP on Supabase Auth: Gmail (`clariqnz@gmail.com`, sender name Clariq) as interim; Resend with `clariq.nz` once DNS access exists | Built-in Supabase mailer is rate-capped and unbranded; never used for customers. |
 | QR generation | Client-side (`qrcode` library) + PDF label sheet | No external service dependency. |
 | QR scanning | Native phone camera (URL) and in-app scanner (`BarcodeDetector` with library fallback) | No app store, no hardware. |
@@ -496,7 +498,7 @@ Each stage ends with an update to this document.
 | Colour palette clash between functional and brand colours | Resolved at UI stage with contrast checks; functional colours can shift within the Okabe–Ito set |
 | Single Admin is a single point of access | Second Admin recommended before go-live; documented in `Handover.md` |
 | Supabase Free plan pauses a project after seven days without traffic; first visitor after that sees errors until an owner restores it (happened to production 9 Sep 2026) | Production: move to Pro before the first live customer (never pauses, daily backups, section 15). Demo: scheduled keep-awake ping (open item 11) |
-| Netlify site name is baked into every printed label | `clariq-hub` is permanent: never renamed, never deleted and recreated. Adding `app.clariq.nz` later does not retire the netlify.app address |
+| Every printed label depends on `app.clariq.nz`, so a lapsed `clariq.nz` registration or a wrong `app` record makes every label in the field dead at once | `clariq.nz` on auto-renew at 1stdomains, login holder named in `Handover.md`; the `app` record is never edited except to point at `clariq-hub.netlify.app` (section 33). `clariq-hub` is still never renamed or recreated, because its netlify.app address forwards to `app.clariq.nz` and carries any label printed with it |
 | A guide in a customer's hands silently disagrees with the app, and neither the customer nor Clariq can tell | Every document carries a version and a "built against" app version (31.4); the register in 31.5 is checked at the end of every build session, so a screen change names the documents it invalidates |
 | Labels have never been weather tested or wash tested, and it cannot be done retrospectively | Three labels on a spare container, a week outside, one wash cycle, scan all three, before any customer stock is printed. Runbook part A5, open item 18 |
 | Backups have never been restored | A restore into a spare project on a calm day, before real chemicals are in the record. Section 15, open item 21 |
@@ -514,9 +516,9 @@ Each stage ends with an update to this document.
 7. Recycled/renewable content percentages to be requested from the container manufacturer.
 8. ~~Production Supabase project to move from Free to Pro before the first live customer (section 17).~~ Closed 15-09-2026: production is on Pro. Supersedes item 17.
 9. Drop the `demo_snapshot` schema on production; the demo seed has been reconciled against it (section 20.4).
-10. Custom domains `app.clariq.nz` and `demo.clariq.nz`: optional, when DNS access exists.
+10. ~~Custom domains `app.clariq.nz` and `demo.clariq.nz`.~~ Closed 06-10-2026: both live, section 33.
 11. Keep-awake ping: built, `netlify/functions/keepalive.mts`; confirm it appears under Functions in both Netlify projects after the next deploy.
-12. Resend SMTP on both projects once `clariq.nz` DNS records can be added; Gmail SMTP is the interim (section 20.6).
+12. Resend SMTP on both projects. Unblocked 06-10-2026: DNS access to `clariq.nz` exists (section 33). Gmail SMTP remains the interim until Resend's records are added (section 20.7). This also unblocks the customer-facing invitation email and the overdue digest.
 13. ~~Demo banner: built (section 20.2, rule 8).~~ Closed: shipped, section 20.2 rule 8.
 14. ~~Branded magic link template on both projects.~~ Closed 15-09-2026: installed through the Supabase dashboard on both projects, because Auth mints the token and the mail can never be app-sent.
 15. Offline action queue (section 17): not built. Decide whether it is needed before the first warehouse goes live.
@@ -535,6 +537,13 @@ Added 15 September 2026. Items 18 to 22 come from the runbook (31.2); the runboo
 25. **Deposit arrangement and expected return days** agreed with the first customer before the first dispatch. Both are awkward to change once transactions exist; dispatch defaults to 60 days (runbook B5).
 26. **Keep the register in 31.5 current** at the end of every build session, in the same pass that updates this document.
 27. **Production has no ledger row for `0021a_load_corpus_file`** (32.2). The file is in `supabase/migrations/` and the function exists on production, so nothing is broken and nothing is to be done. Recorded so a future rebuild comparison does not read it as a missing object.
+
+Added 6 October 2026, from the move to `clariq.nz` (section 33).
+
+28. **Remove the HighLevel DNS leftovers** once HighLevel is cancelled: `links.clariq.nz`, the `leadconnectorhq` include in the `admin.` and `mail.` SPF records, and the Mailgun records on `admin.` and `mail.` if HighLevel was their only user. Check each before deleting; the `clariq.nz` MX, SPF and `MS=` records belong to Microsoft 365 and stay (33.6).
+29. **Retire the netlify.app entries in Supabase Redirect URLs** on both projects, but only after everyone has reinstalled the app from the new address. An install from the old address keeps running from its cache and still signs in there (33.4).
+30. **Everyone reinstalls the home-screen app** from `app.clariq.nz` (and testers from `demo.clariq.nz`). Sign-ins belong to an address, so the first visit to the new one asks for a fresh magic link.
+31. **Name the 1stdomains login holder** in `Handover.md` section 2, and confirm `clariq.nz` is on auto-renew (section 17).
 
 ---
 
@@ -599,7 +608,7 @@ One repository, two Supabase projects, two Netlify projects. Everything that is 
 
 | | Production (the hub) | Demo |
 |---|---|---|
-| Address | `https://clariq-hub.netlify.app` (permanent, on labels) | `https://clariq-demo.netlify.app` |
+| Address | `https://app.clariq.nz` (on labels); `clariq-hub.netlify.app` forwards to it | `https://demo.clariq.nz`; `clariq-demo.netlify.app` forwards to it |
 | Netlify project | `clariq-hub`, team clariqnz (Pro) | `clariq-demo`, same team |
 | Supabase project | `oksxzvomjjsjhjqifqhk`, "Circular Container Tracker", Sydney | `yuwpakqhcwjheibfaeof`, "clariq-demo", Sydney |
 | Netlify env vars | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` for production | same two names, demo project's values |
@@ -621,7 +630,7 @@ In step:
 Apart:
 5. Demo data never enters production. Migration 0023 purged what was there; the seed runs only on the demo project.
 6. Production-only migrations (0022 snapshot, 0023 purge) are not applied to demo. Demo-only migrations (tenant row, `dblink`, `seed_demo`, `reset_demo`, invites) live in `supabase/demo/`, not in `supabase/migrations/`, so no tooling can carry them to production.
-7. Real labels are printed from production only, carrying `https://clariq-hub.netlify.app/c/CLQ-000000`. The `clariq-hub` project name is never changed and never deleted.
+7. Real labels are printed from production only, carrying `https://app.clariq.nz/c/CLQ-000000` (`labels/label-spec.json`, corrected here on 6 October 2026; this rule said netlify.app while the code said `app.clariq.nz`). A sheet printed from the demo points at `demo.clariq.nz` (33.5). The `clariq-hub` project name is never changed and never deleted.
 8. The demo shows a persistent "Demo environment" banner (`components/DemoBanner.tsx`), driven by hostname (`lib/env.ts`) so it cannot ship to production. `?demo=1` is ignored on hosted builds; the in-memory gateway exists for local development only.
 
 Both:
@@ -661,7 +670,7 @@ Not testable from SQL and left as a manual sheet for a phone (`docs/Demo_Manual_
 
 ### 20.7 Auth email
 
-Supabase Auth sends magic links through custom SMTP on both projects. Interim: Gmail (`smtp.gmail.com:465`, `clariqnz@gmail.com`, app password, sender name Clariq). Target: Resend with `noreply@clariq.nz`, which needs three DNS records on `clariq.nz`. The switch is the same five SMTP fields; nothing else changes.
+Supabase Auth sends magic links through custom SMTP on both projects. Interim: Gmail (`smtp.gmail.com:465`, `clariqnz@gmail.com`, app password, sender name Clariq). Target: Resend with `noreply@clariq.nz`, which needs three DNS records on `clariq.nz`; DNS access exists from 6 October 2026 (section 33). The switch is the same five SMTP fields; nothing else changes. The branded templates in use on both projects are Confirm signup and Magic Link or OTP; their logo and footer address were moved to the new domains on 6 October (33.4).
 
 ---
 
@@ -1406,7 +1415,7 @@ Every Clariq document, its owner, its version and what it was last checked again
 
 | Document | Where | Customer facing | Version | Built against | Last touched |
 |---|---|---|---|---|---|
-| Architecture (this document) | `docs/Architecture.md` | no | 0.2, see 31.6 | v0.7.49 | 15-09-2026 |
+| Architecture (this document) | `docs/Architecture.md` | no | 0.2, see 31.6 | v0.7.51 | 06-10-2026 |
 | Guide 1, Running Clariq (Clariq Admin) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
 | Guide 2, Your first month (Customer Admin) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
 | Guide 3, Filling, sending and receiving (Warehouse) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
@@ -1417,8 +1426,8 @@ Every Clariq document, its owner, its version and what it was last checked again
 | Guide 8, Looking at your containers (Customer, view only) | `docs/guides/` | yes | 1.0 | v0.7.43 | 15-09-2026 |
 | Guide index | `docs/guides/index.pdf` | yes | 1.0 | v0.7.43 | 15-09-2026 |
 | Runbook: labels and the first customer | not in repo, open item 24 | no | 1.0 | v0.7.47 | 15-09-2026 |
-| Handover | `docs/Handover.md` | no | 0.1, skeleton | v0.7.x, unchecked | 11-09-2026 |
-| Demo manual checks | `docs/Demo_Manual_Checks.md` | no | 1.0 | v0.7.x, unchecked | 11-09-2026 |
+| Handover | `docs/Handover.md` | no | 0.2, skeleton (addresses and domain account, 33) | v0.7.x, unchecked | 06-10-2026 |
+| Demo manual checks | `docs/Demo_Manual_Checks.md` | no | 1.1 (new addresses) | v0.7.x, unchecked | 06-10-2026 |
 | Hub and demo guide (Jay) | `docs/Jay_Hub_and_Demo_Guide.docx` | no | 1.0 | v0.7.x, pre party model | 10-09-2026 |
 | Queued: supplier visibility | `docs/Queued-supplier-visibility.md` | no | 1.0 | v0.7.46 | 15-09-2026 |
 | Brand guidelines | repo root | no | 1.0 | not applicable | 26-08-2026 |
@@ -1487,3 +1496,71 @@ The statements were pulled verbatim from `supabase_migrations.schema_migrations`
 | 2026-09-15 | Duplicate and missing ledger rows are recorded, not corrected | A migration ledger is a record of what happened, not a tidy list. The same argument as append-only events |
 | 2026-09-15 | `demo_0015_reset_demo_refuses_clearly` renumbered to `demo_0018` | It was applied last, after 0016 and 0017, and two files cannot share a number |
 | 2026-09-15 | `supabase/demo/README.md` rewritten rather than patched | It told the reader to run a function that now refuses, and a wrong instruction is worse than none |
+
+---
+
+## 33. The move to clariq.nz (6 October 2026, v0.7.51)
+
+No migration. Production moved to `app.clariq.nz` and the demo to `demo.clariq.nz`, demo first as the rehearsal. Every step was checked before the next one started.
+
+### 33.1 The two addresses
+
+| | Production | Demo |
+|---|---|---|
+| Address | `https://app.clariq.nz` | `https://demo.clariq.nz` |
+| Netlify project | `clariq-hub`, custom domain set as primary | `clariq-demo`, custom domain set as primary |
+| Old address | `clariq-hub.netlify.app`, forwards (301, path kept) | `clariq-demo.netlify.app`, forwards (301, path kept) |
+| Certificate | Let's Encrypt, issued 22:25 AEST, renews itself | Let's Encrypt, issued 21:06 AEST, renews itself |
+| Supabase Site URL | `https://app.clariq.nz` | `https://demo.clariq.nz` |
+| Supabase Redirect URLs | `https://app.clariq.nz/**`, `https://clariq-hub.netlify.app/**` | `https://demo.clariq.nz/**`, `https://clariq-demo.netlify.app/**` |
+
+`app.clariq.nz` was chosen over a new `portal.clariq.nz` because labels, `label-spec.json` and the in-app guide already said `app.clariq.nz`. It was in use by HighLevel, which is being discontinued; its data was exported before the record moved.
+
+### 33.2 DNS at 1stdomains
+
+`clariq.nz` is registered with 1stdomains, which also answers its DNS (`ns1` and `ns2.1stdomains.net.nz`). No CAA record exists, so nothing restricts which authority may issue a certificate. Records added or changed:
+
+| Record | Type | Value | Purpose |
+|---|---|---|---|
+| `demo.clariq.nz` | CNAME | `clariq-demo.netlify.app` | Demo |
+| `app.clariq.nz` | CNAME | `clariq-hub.netlify.app` | Production. Previously `whitelabel.ludicrous.cloud` (HighLevel); that value is the rollback |
+| `subdomain-owner-verification.clariq.nz` | TXT | `0ba8a87ccaf85a49138be89d63079269` | Netlify's proof of ownership of `clariq.nz` for the team. Covers every subdomain; leave it in place |
+
+Not touched, and not to be touched by this work: `clariq.nz` A (Shopify), `www`, `shops.myshopify.com`, the `clariq.nz` MX, SPF and `MS=` records and `autodiscover` (Microsoft 365), and the Mailgun and HighLevel records on `admin.`, `mail.` and `links.` (open item 28).
+
+### 33.3 What the rehearsal taught
+
+Netlify asks for a TXT record before it will attach any subdomain of a domain it does not host. The first certificate request failed because Netlify asked before its own view of the new record had settled, and its dialog then reported "certificate parameter is required when updating an existing certificate". A page reload showed the certificate issued, three minutes after the domain was attached. For production the record was changed first, the switch was confirmed in public DNS (about 14 minutes, the old record's cache), and only then was the domain attached; the certificate was provisioned on the first request.
+
+Netlify does not forward a netlify.app address to the custom domain by itself; both answer side by side. The forwarding in 33.5 is ours.
+
+### 33.4 Supabase Auth
+
+The new addresses were added to Redirect URLs before either domain was attached, so sign-in never broke. Each Site URL was switched only after its new address had passed a magic-link test on a phone. The netlify.app entries stay until everyone has reinstalled (open item 29): an app installed from the old address keeps running from its cache and still completes sign-in there.
+
+The two branded templates in use on both projects, Confirm signup and Magic Link or OTP, each carried the old address twice, in the logo URL and the footer text. Both were replaced: production with `app.clariq.nz`, demo with `demo.clariq.nz`, so a demo email never shows the production address. The other templates are Supabase defaults built from `{{ .ConfirmationURL }}` and follow the Site URL.
+
+### 33.5 Code
+
+| File | Change |
+|---|---|
+| `netlify.toml` | Two host rules forward `clariq-hub.netlify.app/*` and `clariq-demo.netlify.app/*` to the new address with the path kept, above the single-page-app rule. One file builds both sites; each rule matches only its own host, and deploy previews are unaffected |
+| `src/lib/pdf.ts` | A label sheet printed from the demo encodes `https://demo.clariq.nz/c/<ID>`; production still uses `label-spec.json`. Before this, a demo label scanned once production was live opened production, where the container does not exist |
+| `src/pages/AdminPages.tsx` | The demo labels notice no longer says printing waits for `app.clariq.nz` |
+| `docs/Handover.md`, `docs/Demo_Manual_Checks.md` | Addresses, and the domain account row |
+
+### 33.6 Verification
+
+Demo and production were each checked on a phone in a private tab: padlock, the right sign-in screen, the demo banner present on demo and absent on production, magic-link sign-in landing on the new address, a `/c/<ID>` container link, a click-through, the old address still serving, and a sign-in email showing the new logo and footer. All passed on v0.7.50 before the code in 33.5 was committed. Checked after the commit: the old addresses forward, `/c/<ID>` survives the forward, and a demo label's QR opens the demo (results recorded below when done).
+
+### 33.7 Decisions
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-10-06 | Production on `app.clariq.nz`, not `portal.clariq.nz` | The labels, the spec and the guide already said `app`; HighLevel, its only other user, is being discontinued |
+| 2026-10-06 | Demo first, as the rehearsal | Every step was learned on the environment where a mistake costs nothing; the certificate behaviour in 33.3 was found there |
+| 2026-10-06 | 20.2 rule 7 corrected to `app.clariq.nz` | The rule said netlify.app while `label-spec.json` said `app.clariq.nz`. The code was right; no production labels had been printed |
+| 2026-10-06 | The netlify.app addresses forward rather than stay as equals | Two live addresses means two sets of sign-ins and two installs; one address is what a customer should learn. `clariq-hub` stays, because its forward carries any label or link that names it |
+| 2026-10-06 | Demo labels point at the demo | A test label that opens production is a test that cannot pass |
+| 2026-10-06 | HighLevel DNS records left until HighLevel is cancelled | Removing them mid-move risked breaking mail nobody had mapped (open item 28) |
+
